@@ -157,7 +157,8 @@ illustrious_single_female:
     blurry, jpeg artifacts, signature, watermark, username, text, error,
     ugly, disfigured, mutated,
     child, children, kid, kids, minor, minors, teen, teenager, underage,
-    loli, shota, childlike, juvenile, baby face, school age
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
   tips:
     - "Use masterpiece, best quality, amazing quality, very aesthetic as the quality prefix"
     - "absurdres requests high resolution output detail"
@@ -177,7 +178,8 @@ illustrious_single_male:
     blurry, jpeg artifacts, signature, watermark, username, text, error,
     ugly, disfigured, mutated,
     child, children, kid, kids, minor, minors, teen, teenager, underage,
-    loli, shota, childlike, juvenile, baby face, school age
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
 
 # ---------------------------------------------------------------------------
 # ILLUSTRIOUS XL — MULTI-PERSON
@@ -187,26 +189,28 @@ illustrious_duo:
   description: "1 boy + 1 girl, realistic, Illustrious XL"
   positive: >
     masterpiece, best quality, amazing quality, very aesthetic,
-    photorealistic, realistic skin, (perfect face:1.2), (detailed face:1.2),
-    beautiful eyes, symmetrical eyes, defined nose, natural lips,
-    adult, 1boy, adult, 1girl, 2people,
-    standing together, casual clothes, outdoor, natural lighting, sharp focus
+    photorealistic, RAW photo, realistic skin,
+    adult, (1boy:1.2), adult, (1girl:1.2),
+    standing together, casual clothes, white studio background, soft studio lighting, sharp focus
   negative: >
     worst quality, bad quality, lowres, blurry,
-    solo, 3girls, 3boys, group, crowd, extra person,
+    solo, 2girls, 2boys, 3girls, 3boys, 3people, trio, threesome,
+    group, crowd, many people, multiple people, extra person, additional person,
+    background figures, background characters,
     bad anatomy, bad hands, deformed, mutated,
-    deformed face, bad face, disfigured face, asymmetrical face,
-    bad eyes, uneven eyes, cross-eyed, poorly drawn eyes,
-    bad nose, bad mouth,
+    deformed face, bad face, warped face, distorted face,
+    bad eyes, cross-eyed, bad nose, bad mouth,
     cartoon, anime, illustration, flat color, cel shading,
     watermark, text,
     child, children, kid, kids, minor, minors, teen, teenager, underage,
-    loli, shota, childlike, juvenile, baby face, school age
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
   tips:
-    - "photorealistic + realistic skin are the realism anchors — keep them"
-    - "cartoon, anime, illustration in negative prevent style drift"
-    - "KSampler: steps 25, cfg 5, euler_ancestral, karras, 1024x1024"
-    - "If still drifts to anime: raise cfg to 6, add RAW photo to positive"
+    - "1boy + 1girl ARE the count tags in Danbooru — do not add 2people or similar"
+    - "(1boy:1.2) (1girl:1.2) mild weight stops the model diluting the count"
+    - "2girls, 2boys in negative prevents the model upcounting either gender"
+    - "Removed face-feature tags — they create extra face budget and generate more faces"
+    - "KSampler: steps 25, cfg 5, euler_ancestral, karras, 1216x1024"
 
 # ---------------------------------------------------------------------------
 # ILLUSTRIOUS XL — ANIME / ILLUSTRATION
@@ -224,7 +228,8 @@ illustrious_anime_single_female:
     missing fingers, extra limbs, deformed, blurry, realistic, photo,
     watermark, text, signature, ugly, disfigured,
     child, children, kid, kids, minor, minors, teen, teenager, underage,
-    loli, shota, childlike, juvenile, baby face, school age
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
   tips:
     - "anime style or anime coloring reinforces the style direction"
     - "Add realistic and photo to negative to avoid photorealism drift"
@@ -287,7 +292,7 @@ ksampler_settings:
     sampler: euler_ancestral
     scheduler: karras
     denoise: 1.0
-    resolution: "1024x1024"
+    resolution: "1216x1024"  # wider gives bodies room; taller gives faces more pixels vs 1024x1024
 
   illustrious_img2img:
     steps: 25
