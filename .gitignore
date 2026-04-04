@@ -6,3 +6,7 @@ output/
 
 # Input files
 input/
+
+# Keep workflows folder but ignore any large binary files inside it
+workflows/*.png
+workflows/*.jpg

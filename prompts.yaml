@@ -1,0 +1,159 @@
+# Pony Diffusion V6 XL — Prompt Library
+# Usage: Copy the positive/negative values into the CLIP Text Encode nodes in ComfyUI.
+# All prompts use the standard quality prefix: score_9, score_8_up, score_7_up
+
+# ---------------------------------------------------------------------------
+# SINGLE PERSON — REALISTIC
+# ---------------------------------------------------------------------------
+
+realistic_single_female:
+  description: "Single female, photorealistic, outdoor"
+  positive: >
+    score_9, score_8_up, score_7_up, source_realistic, 1girl, solo,
+    detailed face, beautiful eyes, long brown hair, casual outfit, standing,
+    outdoor background, natural lighting, masterpiece, high quality,
+    detailed skin, sharp focus, looking at viewer
+  negative: >
+    score_4, score_5, score_6, bad anatomy, extra limbs, deformed hands,
+    bad hands, missing fingers, fused fingers, mutated, low quality, blurry,
+    watermark, text, ugly, disfigured
+  tips:
+    - "Use 1girl / 1boy / 1person to define subject count and gender"
+    - "Add solo to keep focus on a single subject"
+    - "Describe hair, clothing, and setting for more control"
+    - "Always include deformed hands, bad hands, missing fingers in negative"
+
+realistic_single_male:
+  description: "Single male, photorealistic, outdoor"
+  positive: >
+    score_9, score_8_up, score_7_up, source_realistic, 1boy, solo,
+    detailed face, short black hair, casual outfit, standing,
+    outdoor background, natural lighting, masterpiece, high quality,
+    detailed skin, sharp focus, looking at viewer
+  negative: >
+    score_4, score_5, score_6, bad anatomy, extra limbs, deformed hands,
+    bad hands, missing fingers, fused fingers, mutated, low quality, blurry,
+    watermark, text, ugly, disfigured
+
+# ---------------------------------------------------------------------------
+# MULTI-PERSON — REALISTIC
+# ---------------------------------------------------------------------------
+
+realistic_boy_and_girl:
+  description: "1 boy + 1 girl, photorealistic, standing together"
+  positive: >
+    score_9, score_8_up, score_7_up, source_realistic,
+    (2persons:1.4), (1boy:1.3), (1girl:1.3), duo, two people,
+    both fully visible, standing side by side, detailed faces,
+    natural lighting, casual outfits, outdoor background,
+    masterpiece, high quality, wide shot
+  negative: >
+    score_4, score_5, score_6, solo, single person, one person, 1person,
+    bad anatomy, extra limbs, deformed hands, bad hands, missing fingers,
+    fused fingers, extra fingers, low quality, blurry, watermark, text,
+    ugly, disfigured, mutated, three people, cropped
+  tips:
+    - "Use (2persons:1.4) weight emphasis to force two subjects"
+    - "Add solo, single person to the negative prompt"
+    - "Lower CFG scale to 5-6 and increase steps to 30+ if anatomy is off"
+    - "Use width 1216, height 832 for better two-person composition"
+    - "Differentiate subjects: 1boy with short black hair, 1girl with long blonde hair"
+
+# ---------------------------------------------------------------------------
+# SINGLE PERSON — CARTOON
+# ---------------------------------------------------------------------------
+
+cartoon_single_male:
+  description: "Single male, western cartoon style"
+  positive: >
+    score_9, score_8_up, score_7_up, source_cartoon, 1boy, solo,
+    expressive face, stylized proportions, colorful outfit, dynamic pose,
+    bright background, masterpiece, high quality, clean lineart, vibrant colors
+  negative: >
+    score_4, score_5, score_6, bad anatomy, extra limbs, deformed,
+    low quality, blurry, realistic, photo, watermark, text, grainy
+  tips:
+    - "Add clean lineart and vibrant colors for cartoon aesthetic"
+    - "Use dynamic pose or action pose for energetic compositions"
+    - "Add realistic and photo to negative to prevent photorealism drift"
+    - "expressive face works well for exaggerated readable emotions"
+
+# ---------------------------------------------------------------------------
+# GENERAL
+# ---------------------------------------------------------------------------
+
+general_negative:
+  description: "Universal negative prompt — safe to use with any style"
+  negative: >
+    score_4, score_5, score_6, bad anatomy, extra limbs, deformed hands,
+    bad hands, missing fingers, fused fingers, low quality, blurry,
+    watermark, text, ugly, disfigured, mutated
+
+# ---------------------------------------------------------------------------
+# MULTI-PERSON ACTIVITIES — REALISTIC (1 boy + 1 girl)
+# ---------------------------------------------------------------------------
+
+realistic_duo_walking_park:
+  description: "1 boy + 1 girl walking together in a park"
+  positive: >
+    score_9, score_8_up, score_7_up, source_realistic,
+    (2persons:1.4), (1boy:1.3), (1girl:1.3), duo,
+    walking side by side, holding hands, park path, trees in background,
+    golden hour lighting, casual outfits, masterpiece, high quality, sharp focus
+  negative: >
+    score_4, score_5, score_6, solo, single person, one person, 1person,
+    bad anatomy, deformed hands, bad hands, missing fingers, extra limbs,
+    low quality, blurry, watermark, text, three people
+
+realistic_duo_cafe:
+  description: "1 boy + 1 girl sitting at a cafe"
+  positive: >
+    score_9, score_8_up, score_7_up, source_realistic,
+    (2persons:1.4), (1boy:1.3), (1girl:1.3), duo,
+    sitting across from each other, cafe table, coffee cups, indoor setting,
+    warm lighting, casual outfits, smiling, masterpiece, high quality, sharp focus
+  negative: >
+    score_4, score_5, score_6, solo, single person, one person, 1person,
+    bad anatomy, deformed hands, bad hands, missing fingers, extra limbs,
+    low quality, blurry, watermark, text, three people
+
+realistic_duo_running:
+  description: "1 boy + 1 girl running / sports activity"
+  positive: >
+    score_9, score_8_up, score_7_up, source_realistic,
+    (2persons:1.4), (1boy:1.3), (1girl:1.3), duo,
+    running together, athletic wear, outdoor track, motion blur on legs,
+    dynamic pose, masterpiece, high quality, sharp focus
+  negative: >
+    score_4, score_5, score_6, solo, single person, one person, 1person,
+    bad anatomy, deformed hands, bad hands, missing fingers, extra limbs,
+    static pose, low quality, blurry, watermark, text, three people
+
+# ---------------------------------------------------------------------------
+# KSAMPLER RECOMMENDED SETTINGS
+# ---------------------------------------------------------------------------
+
+ksampler_settings:
+  single_person:
+    steps: 20
+    cfg_scale: 7
+    sampler: dpmpp_2m
+    scheduler: karras
+    denoise: 1.0
+    resolution: "896x1152"
+
+  multi_person:
+    steps: 30
+    cfg_scale: 6
+    sampler: dpmpp_2m
+    scheduler: karras
+    denoise: 1.0
+    resolution: "1216x832"
+
+  img2img:
+    steps: 20
+    cfg_scale: 7
+    sampler: dpmpp_2m
+    scheduler: karras
+    denoise: 0.5   # lower = keep more of original image
+    resolution: "match source image"

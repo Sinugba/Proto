@@ -1,24 +1,7 @@
 version: '3.8'
-# services:
-#   comfyui:
-#     image: comfyui/comfyui
-#     ports:
-#       - "8188:8188"
-#     volumes:
-#       - ./models:/app/models
-#       - ./input:/app/input
-#       - ./output:/app/output
-#     deploy:
-#       resources:
-#         reservations:
-#           devices:
-#             - driver: nvidia
-#               count: 1
-#               capabilities: [gpu]
 services:
   comfyui:
     image: ghcr.io/ai-dock/comfyui:latest-cuda
-    runtime: nvidia
     ports:
       - "1111:1111"
       - "8188:8188"
@@ -28,6 +11,14 @@ services:
       - ./output:/opt/ComfyUI/output
     environment:
         - NVIDIA_VISIBLE_DEVICES=all
+        - NVIDIA_DRIVER_CAPABILITIES=all
         - WEB_AUTHENTICATION=false
         - WEB_USER=user
         - WEB_PASSWORD=password
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

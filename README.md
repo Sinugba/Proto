@@ -168,55 +168,92 @@ score_9, score_8_up, score_7_up, <your subject and style tags>, masterpiece, hig
 | `source_cartoon` | Western cartoon style |
 | `source_realistic` | Photorealistic human style |
 
----
+### Prompt Library
 
-### Prompt Examples
+All ready-to-use positive/negative prompt combinations are stored in [`prompts.yaml`](prompts.yaml).
 
-#### `source_realistic` — Photorealistic Human Figure
+| Key | Description |
+|-----|-------------|
+| `realistic_single_female` | Single female, photorealistic, outdoor |
+| `realistic_single_male` | Single male, photorealistic, outdoor |
+| `realistic_boy_and_girl` | 1 boy + 1 girl, photorealistic, standing together |
+| `cartoon_single_male` | Single male, western cartoon style |
+| `general_negative` | Universal negative prompt for any style |
 
-**Positive:**
-```
-score_9, score_8_up, score_7_up, source_realistic, 1girl, solo, detailed face, beautiful eyes, long brown hair, casual outfit, standing, outdoor background, natural lighting, masterpiece, high quality, detailed skin, sharp focus, looking at viewer
-```
+The file also includes recommended **KSampler settings** for single person, multi-person, and img2img workflows.
 
-**Negative:**
-```
-score_4, score_5, score_6, bad anatomy, extra limbs, deformed hands, bad hands, missing fingers, fused fingers, mutated, low quality, blurry, watermark, text, ugly, disfigured
-```
+### Saved Workflows
 
-**Tips:**
-- Use `1girl` / `1boy` / `1person` to define subject count and gender.
-- Add `solo` to keep focus on a single subject.
-- Describe hair (`long brown hair`), clothing (`casual outfit`), and setting (`outdoor background`) for more control.
-- Always include `deformed hands, bad hands, missing fingers` in the negative prompt — hand anatomy is the most common failure point.
+Complete ComfyUI node graph exports (including prompts and sampler settings) are stored in the [`workflows/`](workflows/) folder. Load them directly in ComfyUI via the **Load** button.
 
----
+### Tips for Multi-Person Scenes
 
-#### `source_cartoon` — Western Cartoon Style Human Figure
-
-**Positive:**
-```
-score_9, score_8_up, score_7_up, source_cartoon, 1boy, solo, expressive face, stylized proportions, colorful outfit, dynamic pose, bright background, masterpiece, high quality, clean lineart, vibrant colors
-```
-
-**Negative:**
-```
-score_4, score_5, score_6, bad anatomy, extra limbs, deformed, low quality, blurry, realistic, photo, watermark, text, grainy
-```
-
-**Tips:**
-- Add `clean lineart` and `vibrant colors` to enhance the cartoon aesthetic.
-- Use `dynamic pose` or `action pose` for more energetic compositions.
-- Add `realistic` and `photo` to the negative prompt to prevent the model from drifting toward photorealism.
-- `expressive face` works well for cartoon styles to get exaggerated, readable emotions.
+- Use `(2persons:1.4), (1boy:1.3), (1girl:1.3)` weight emphasis to force two subjects.
+- Add `solo, single person, one person` to the **negative** prompt.
+- Lower CFG scale to `5-6` and increase steps to `30+` if anatomy is off.
+- Use resolution `1216x832` (landscape) for better two-person composition.
 
 ---
 
-### General Negative Prompt (works for all styles)
+## Using a Reference Image as a Template
 
-```
-score_4, score_5, score_6, bad anatomy, extra limbs, deformed hands, bad hands, missing fingers, fused fingers, low quality, blurry, watermark, text, ugly, disfigured, mutated
-```
+### Option 1: Image-to-Image (img2img)
+
+This takes an input image and regenerates it in the model's style while preserving the general composition.
+
+1. In ComfyUI, right-click the canvas → **Add Node → Image → Load Image**.
+2. Upload your template/reference image.
+3. Add a **VAE Encode** node and connect the image output to it.
+4. Connect the **VAE Encode** output to the **KSampler's `latent_image`** input, replacing the default **Empty Latent Image** node.
+5. Adjust the **Denoise** value on the KSampler to control how much the original image is preserved:
+
+| Denoise Value | Effect |
+|---------------|--------|
+| `0.75` | Heavy restyling, ~25% of original preserved |
+| `0.5` | Balanced, ~50% of original preserved |
+| `0.3` | Light changes, ~70% of original preserved |
+
+> Place your reference images in the `./input/` folder — it is already mounted to the container at `/opt/ComfyUI/input` and accessible via the Load Image node.
+
+---
+
+### Option 2: ControlNet — Precise Pose and Structure Control
+
+ControlNet extracts structure (pose, edges, depth) from a reference image and applies it precisely to the generated output. Use this when you need to match a specific pose or composition exactly.
+
+#### Setup
+
+1. Download an SDXL-compatible ControlNet model (e.g., `controlnet-openpose-sdxl`) and place it in:
+   ```
+   models/controlnet/
+   ```
+2. In ComfyUI, right-click the canvas → **Add Node → Loaders → Load ControlNet Model**.
+3. Right-click → **Add Node → Conditioning → Apply ControlNet**.
+4. Connect the nodes as follows:
+   - Reference image → **Apply ControlNet `image`**
+   - ControlNet model → **Apply ControlNet `control_net`**
+   - Positive prompt → **Apply ControlNet `conditioning`**
+   - Apply ControlNet output → **KSampler `positive`**
+
+#### ControlNet Types
+
+| ControlNet Type | Best For |
+|-----------------|----------|
+| OpenPose | Matching a specific body pose |
+| Canny / Lineart | Preserving edges and outlines |
+| Depth | Preserving 3D depth and structure |
+| SoftEdge | Softer edge guidance, less rigid |
+
+---
+
+### Which Approach to Use?
+
+| Scenario | Best Option |
+|----------|-------------|
+| Restyle an existing image | img2img |
+| Match a specific pose exactly | ControlNet (OpenPose) |
+| Preserve edges / outlines | ControlNet (Canny / Lineart) |
+| Preserve depth / structure | ControlNet (Depth) |
 
 ---
 
