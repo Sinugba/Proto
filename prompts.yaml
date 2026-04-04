@@ -182,7 +182,63 @@ pony_img2img_restyle:
     - "If background still breaks: lower denoise to 0.35"
     - "For subject-only restyle with locked background: use inpaint mask on subject only"
 
-pony_img2img_restyle_add_boy:
+pony_img2img_restyle_clothing:
+  description: "Restyle clothing only on existing image, preserve face/body/background — Pony Diffusion V6 XL"
+  positive: >
+    score_9, score_8_up, score_7_up, source_realistic,
+    masterpiece, high quality, detailed skin, sharp focus,
+    new outfit, different clothing, changed clothes,
+    same person, same face, same hairstyle, same body,
+    consistent background, coherent background, same setting as original,
+    natural lighting
+  negative: >
+    score_4, score_5, score_6, bad anatomy, deformed hands, bad hands,
+    missing fingers, low quality, blurry, watermark, text, ugly, disfigured,
+    different person, changed face, changed hair, changed body,
+    deformed face, bad face, asymmetrical face, warped face,
+    bad eyes, cross-eyed, poorly drawn eyes,
+    incoherent background, distorted background, gibberish background,
+    random patterns, noisy background, abstract background, corrupted,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
+  tips:
+    - "Use inpaint mask on clothing area only — most reliable method for clothing swap"
+    - "Keep denoise at 0.5-0.6: enough to change clothes, not enough to alter face/body"
+    - "same person, same face, same hairstyle anchor identity during restyle"
+    - "different person, changed face in negative prevents identity drift"
+    - "Describe the new outfit explicitly before applying: e.g. add 'red dress, sleeveless' to positive"
+    - "KSampler: steps 20, cfg 7, dpmpp_2m, karras, denoise 0.55"
+
+pony_img2img_restyle_body:
+  description: "Replace/restyle body while preserving face and background — Pony Diffusion V6 XL"
+  positive: >
+    score_9, score_8_up, score_7_up, source_realistic,
+    masterpiece, high quality, detailed skin, sharp focus,
+    same person, same face, same hairstyle, same expression,
+    new body, fit body, toned body, athletic build,
+    consistent background, coherent background, same setting as original,
+    natural lighting
+  negative: >
+    score_4, score_5, score_6, bad anatomy, deformed hands, bad hands,
+    missing fingers, extra limbs, low quality, blurry, watermark, text, ugly, disfigured,
+    different person, changed face, changed hair, changed expression,
+    deformed face, bad face, asymmetrical face, warped face,
+    bad eyes, cross-eyed, poorly drawn eyes,
+    incoherent background, distorted background, gibberish background,
+    random patterns, noisy background, abstract background, corrupted,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
+  tips:
+    - "Use inpaint mask on body area only — exclude face and background from the mask"
+    - "Keep denoise at 0.55-0.65: higher than clothing swap since body shape changes more"
+    - "same person, same face, same hairstyle, same expression lock identity"
+    - "Describe target body explicitly: replace 'fit body, toned body' with your goal"
+    - "different person, changed face in negative prevents face being redrawn"
+    - "KSampler: steps 25, cfg 7, dpmpp_2m, karras, denoise 0.6"
+    
+pony_img2img_add_person:
   description: "Add a 2nd person (boy) to an existing image via img2img — Pony Diffusion V6 XL"
   positive: >
     score_9, score_8_up, score_7_up, source_realistic,
