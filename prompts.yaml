@@ -129,12 +129,122 @@ realistic_duo_running:
     bad anatomy, deformed hands, bad hands, missing fingers, extra limbs,
     static pose, low quality, blurry, watermark, text, three people
 
+# ===========================================================================
+# ILLUSTRIOUS XL — illustriousXL_v01.safetensors (or later version)
+# Model: https://civitai.com/models/795765/illustrious-xl
+# Drop the .safetensors file into models/checkpoints/, then select it in
+# the CheckpointLoaderSimple node in ComfyUI.
+#
+# Key difference from Pony: uses aesthetic quality tags instead of score_N.
+# Illustrious excels at anime, illustration, and semi-realistic art styles.
+# Uses Danbooru-style tags for subjects and settings.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# ILLUSTRIOUS XL — SINGLE PERSON
+# ---------------------------------------------------------------------------
+
+illustrious_single_female:
+  description: "Single female, illustration style, Illustrious XL"
+  positive: >
+    masterpiece, best quality, amazing quality, very aesthetic, absurdres,
+    adult, 1girl, solo, detailed face, beautiful eyes, long brown hair,
+    casual outfit, standing, outdoor background, natural lighting,
+    sharp focus, looking at viewer
+  negative: >
+    worst quality, bad quality, lowres, bad anatomy, bad hands,
+    missing fingers, extra digit, fewer digits, extra limbs, deformed,
+    blurry, jpeg artifacts, signature, watermark, username, text, error,
+    ugly, disfigured, mutated,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age
+  tips:
+    - "Use masterpiece, best quality, amazing quality, very aesthetic as the quality prefix"
+    - "absurdres requests high resolution output detail"
+    - "Danbooru tags work well: 1girl, solo, long hair, school uniform, etc."
+    - "Do NOT mix Pony score_N tags — they are ignored by Illustrious"
+
+illustrious_single_male:
+  description: "Single male, illustration style, Illustrious XL"
+  positive: >
+    masterpiece, best quality, amazing quality, very aesthetic, absurdres,
+    adult, 1boy, solo, detailed face, short black hair,
+    casual outfit, standing, outdoor background, natural lighting,
+    sharp focus, looking at viewer
+  negative: >
+    worst quality, bad quality, lowres, bad anatomy, bad hands,
+    missing fingers, extra digit, fewer digits, extra limbs, deformed,
+    blurry, jpeg artifacts, signature, watermark, username, text, error,
+    ugly, disfigured, mutated,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age
+
+# ---------------------------------------------------------------------------
+# ILLUSTRIOUS XL — MULTI-PERSON
+# ---------------------------------------------------------------------------
+
+illustrious_duo:
+  description: "1 boy + 1 girl, realistic, Illustrious XL"
+  positive: >
+    masterpiece, best quality, amazing quality, very aesthetic,
+    photorealistic, realistic skin, detailed face,
+    adult, 1boy, adult, 1girl, 2people,
+    standing together, casual clothes, outdoor, natural lighting, sharp focus
+  negative: >
+    worst quality, bad quality, lowres, blurry,
+    solo, 3girls, 3boys, group, crowd, extra person,
+    bad anatomy, bad hands, deformed, mutated,
+    cartoon, anime, illustration, flat color, cel shading,
+    watermark, text,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age
+  tips:
+    - "photorealistic + realistic skin are the realism anchors — keep them"
+    - "cartoon, anime, illustration in negative prevent style drift"
+    - "KSampler: steps 25, cfg 5, euler_ancestral, karras, 1024x1024"
+    - "If still drifts to anime: raise cfg to 6, add RAW photo to positive"
+
+# ---------------------------------------------------------------------------
+# ILLUSTRIOUS XL — ANIME / ILLUSTRATION
+# ---------------------------------------------------------------------------
+
+illustrious_anime_single_female:
+  description: "Single female, anime style, Illustrious XL"
+  positive: >
+    masterpiece, best quality, amazing quality, very aesthetic, absurdres,
+    anime style, adult, 1girl, solo, expressive eyes, colorful hair,
+    mature woman, college setting, detailed background,
+    soft lighting, sharp lineart
+  negative: >
+    worst quality, bad quality, lowres, bad anatomy, bad hands,
+    missing fingers, extra limbs, deformed, blurry, realistic, photo,
+    watermark, text, signature, ugly, disfigured,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age
+  tips:
+    - "anime style or anime coloring reinforces the style direction"
+    - "Add realistic and photo to negative to avoid photorealism drift"
+    - "Illustrious is natively tuned on anime — minimal style prompting needed"
+
+# ---------------------------------------------------------------------------
+# ILLUSTRIOUS XL — GENERAL NEGATIVE
+# ---------------------------------------------------------------------------
+
+illustrious_general_negative:
+  description: "Universal negative prompt for Illustrious XL"
+  negative: >
+    worst quality, bad quality, lowres, bad anatomy, bad hands,
+    missing fingers, extra digit, fewer digits, extra limbs, deformed,
+    blurry, jpeg artifacts, signature, watermark, username, text, error,
+    ugly, disfigured, mutated
+
 # ---------------------------------------------------------------------------
 # KSAMPLER RECOMMENDED SETTINGS
 # ---------------------------------------------------------------------------
 
 ksampler_settings:
-  single_person:
+  # --- Pony Diffusion V6 XL ---
+  pony_single_person:
     steps: 20
     cfg_scale: 7
     sampler: dpmpp_2m
@@ -142,7 +252,7 @@ ksampler_settings:
     denoise: 1.0
     resolution: "896x1152"
 
-  multi_person:
+  pony_multi_person:
     steps: 30
     cfg_scale: 6
     sampler: dpmpp_2m
@@ -150,10 +260,35 @@ ksampler_settings:
     denoise: 1.0
     resolution: "1216x832"
 
-  img2img:
+  pony_img2img:
     steps: 20
     cfg_scale: 7
     sampler: dpmpp_2m
     scheduler: karras
     denoise: 0.5   # lower = keep more of original image
+    resolution: "match source image"
+
+  # --- Illustrious XL ---
+  illustrious_single_person:
+    steps: 25
+    cfg_scale: 7
+    sampler: euler_ancestral
+    scheduler: karras
+    denoise: 1.0
+    resolution: "832x1216"   # portrait; use 1024x1024 for square
+
+  illustrious_multi_person:
+    steps: 25
+    cfg_scale: 5
+    sampler: euler_ancestral
+    scheduler: karras
+    denoise: 1.0
+    resolution: "1024x1024"
+
+  illustrious_img2img:
+    steps: 25
+    cfg_scale: 7
+    sampler: euler_ancestral
+    scheduler: karras
+    denoise: 0.5
     resolution: "match source image"
