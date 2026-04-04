@@ -195,25 +195,87 @@ Complete ComfyUI node graph exports (including prompts and sampler settings) are
 
 ---
 
+## ComfyUI Node Wiring Reference
+
+### Default Text-to-Image Workflow
+
+The default workflow node connections:
+
+```
+[Load Checkpoint] ──MODEL──► [KSampler] model
+[Load Checkpoint] ──CLIP───► [CLIP Text Encode +] ──CONDITIONING──► [KSampler] positive
+[Load Checkpoint] ──CLIP───► [CLIP Text Encode -] ──CONDITIONING──► [KSampler] negative
+[Load Checkpoint] ──VAE────► [VAE Decode] vae
+
+[Empty Latent Image] ──LATENT──► [KSampler] latent_image
+
+[KSampler] ──LATENT──► [VAE Decode] samples
+[VAE Decode] ──IMAGE──► [Save Image]
+```
+
+**Load Checkpoint outputs (3 dots on the right side):**
+
+| Output | Connects to |
+|--------|-------------|
+| `MODEL` (top) | KSampler `model` |
+| `CLIP` (middle) | Both CLIP Text Encode nodes `clip` |
+| `VAE` (bottom) | VAE Decode `vae` and VAE Encode `vae` |
+
+---
+
+### Adding Nodes
+
+- **Right-click** on empty canvas → browse the menu to find nodes by category.
+- **Double-click** on empty canvas → opens a search box, type the node name.
+
+---
+
 ## Using a Reference Image as a Template
 
 ### Option 1: Image-to-Image (img2img)
 
 This takes an input image and regenerates it in the model's style while preserving the general composition.
 
-1. In ComfyUI, right-click the canvas → **Add Node → Image → Load Image**.
-2. Upload your template/reference image.
-3. Add a **VAE Encode** node and connect the image output to it.
-4. Connect the **VAE Encode** output to the **KSampler's `latent_image`** input, replacing the default **Empty Latent Image** node.
-5. Adjust the **Denoise** value on the KSampler to control how much the original image is preserved:
+#### Adding the VAE Encode node
 
-| Denoise Value | Effect |
-|---------------|--------|
-| `0.75` | Heavy restyling, ~25% of original preserved |
-| `0.5` | Balanced, ~50% of original preserved |
-| `0.3` | Light changes, ~70% of original preserved |
+1. Double-click on empty canvas → type `VAE Encode` → click to add it.
+2. Right-click canvas → **Add Node → Image → Load Image** to add the image loader.
 
-> Place your reference images in the `./input/` folder — it is already mounted to the container at `/opt/ComfyUI/input` and accessible via the Load Image node.
+#### Full img2img node wiring
+
+```
+[Load Checkpoint] ──MODEL──► [KSampler] model
+[Load Checkpoint] ──CLIP───► [CLIP Text Encode +] ──CONDITIONING──► [KSampler] positive
+[Load Checkpoint] ──CLIP───► [CLIP Text Encode -] ──CONDITIONING──► [KSampler] negative
+[Load Checkpoint] ──VAE────► [VAE Encode] vae
+[Load Checkpoint] ──VAE────► [VAE Decode] vae
+
+[Load Image] ──IMAGE──► [VAE Encode] pixels
+
+[VAE Encode] ──LATENT──► [KSampler] latent_image
+
+[KSampler] ──LATENT──► [VAE Decode] samples
+[VAE Decode] ──IMAGE──► [Save Image]
+```
+
+> **Important:** Disconnect or delete the **Empty Latent Image** node and replace it with the **VAE Encode** output connected to the KSampler `latent_image` input.
+
+#### Denoise settings
+
+Adjust the **Denoise** value on the KSampler to control how much of the original image is preserved:
+
+| Denoise | Prompt Influence | Image Influence | Use When |
+|---------|-----------------|-----------------|----------|
+| `0.9` | Very strong | Weak | Heavy restyle |
+| `0.75` | Strong | Moderate | Default starting point |
+| `0.5` | Balanced | Balanced | Balanced restyle |
+| `0.3` | Weak | Strong | Light touch / minor changes |
+
+#### Prompts in img2img
+
+Prompts work identically to text-to-image — enter them in the **CLIP Text Encode** nodes. Higher denoise = prompt has stronger influence over the final image.
+
+> Place your reference images in the `./input/` folder — it is mounted to `/opt/ComfyUI/input` inside the container and accessible via the Load Image node.
 
 ---
 
@@ -227,13 +289,26 @@ ControlNet extracts structure (pose, edges, depth) from a reference image and ap
    ```
    models/controlnet/
    ```
-2. In ComfyUI, right-click the canvas → **Add Node → Loaders → Load ControlNet Model**.
-3. Right-click → **Add Node → Conditioning → Apply ControlNet**.
-4. Connect the nodes as follows:
-   - Reference image → **Apply ControlNet `image`**
-   - ControlNet model → **Apply ControlNet `control_net`**
-   - Positive prompt → **Apply ControlNet `conditioning`**
-   - Apply ControlNet output → **KSampler `positive`**
+2. Double-click canvas → search `Load ControlNet Model` → add it.
+3. Double-click canvas → search `Apply ControlNet` → add it.
+
+#### ControlNet node wiring
+
+```
+[Load Checkpoint] ──MODEL──► [KSampler] model
+[Load Checkpoint] ──CLIP───► [CLIP Text Encode +] ──CONDITIONING──► [Apply ControlNet] conditioning
+[Load Checkpoint] ──CLIP───► [CLIP Text Encode -] ──CONDITIONING──► [KSampler] negative
+[Load Checkpoint] ──VAE────► [VAE Decode] vae
+
+[Load ControlNet Model] ──CONTROL_NET──► [Apply ControlNet] control_net
+[Load Image] ──IMAGE──► [Apply ControlNet] image
+
+[Apply ControlNet] ──CONDITIONING──► [KSampler] positive
+
+[Empty Latent Image] ──LATENT──► [KSampler] latent_image
+[KSampler] ──LATENT──► [VAE Decode] samples
+[VAE Decode] ──IMAGE──► [Save Image]
+```
 
 #### ControlNet Types
 
