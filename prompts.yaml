@@ -43,7 +43,7 @@ realistic_boy_and_girl:
   description: "1 boy + 1 girl, photorealistic, standing together"
   positive: >
     score_9, score_8_up, score_7_up, source_realistic,
-    (2persons:1.4), (1boy:1.3), (1girl:1.3), duo, two people,
+    (2persons:1.4), adult, (1boy:1.3), adult, (1girl:1.3), duo, two people,
     both fully visible, standing side by side, detailed faces,
     natural lighting, casual outfits, outdoor background,
     masterpiece, high quality, wide shot
@@ -51,7 +51,10 @@ realistic_boy_and_girl:
     score_4, score_5, score_6, solo, single person, one person, 1person,
     bad anatomy, extra limbs, deformed hands, bad hands, missing fingers,
     fused fingers, extra fingers, low quality, blurry, watermark, text,
-    ugly, disfigured, mutated, three people, cropped
+    ugly, disfigured, mutated, three people, cropped,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
   tips:
     - "Use (2persons:1.4) weight emphasis to force two subjects"
     - "Add solo, single person to the negative prompt"
@@ -97,37 +100,46 @@ realistic_duo_walking_park:
   description: "1 boy + 1 girl walking together in a park"
   positive: >
     score_9, score_8_up, score_7_up, source_realistic,
-    (2persons:1.4), (1boy:1.3), (1girl:1.3), duo,
+    (2persons:1.4), adult, (1boy:1.3), adult, (1girl:1.3), duo,
     walking side by side, holding hands, park path, trees in background,
     golden hour lighting, casual outfits, masterpiece, high quality, sharp focus
   negative: >
     score_4, score_5, score_6, solo, single person, one person, 1person,
     bad anatomy, deformed hands, bad hands, missing fingers, extra limbs,
-    low quality, blurry, watermark, text, three people
+    low quality, blurry, watermark, text, three people,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
 
 realistic_duo_cafe:
   description: "1 boy + 1 girl sitting at a cafe"
   positive: >
     score_9, score_8_up, score_7_up, source_realistic,
-    (2persons:1.4), (1boy:1.3), (1girl:1.3), duo,
+    (2persons:1.4), adult, (1boy:1.3), adult, (1girl:1.3), duo,
     sitting across from each other, cafe table, coffee cups, indoor setting,
     warm lighting, casual outfits, smiling, masterpiece, high quality, sharp focus
   negative: >
     score_4, score_5, score_6, solo, single person, one person, 1person,
     bad anatomy, deformed hands, bad hands, missing fingers, extra limbs,
-    low quality, blurry, watermark, text, three people
+    low quality, blurry, watermark, text, three people,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
 
 realistic_duo_running:
   description: "1 boy + 1 girl running / sports activity"
   positive: >
     score_9, score_8_up, score_7_up, source_realistic,
-    (2persons:1.4), (1boy:1.3), (1girl:1.3), duo,
+    (2persons:1.4), adult, (1boy:1.3), adult, (1girl:1.3), duo,
     running together, athletic wear, outdoor track, motion blur on legs,
     dynamic pose, masterpiece, high quality, sharp focus
   negative: >
     score_4, score_5, score_6, solo, single person, one person, 1person,
     bad anatomy, deformed hands, bad hands, missing fingers, extra limbs,
-    static pose, low quality, blurry, watermark, text, three people
+    static pose, low quality, blurry, watermark, text, three people,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
 
 # ===========================================================================
 # ILLUSTRIOUS XL — illustriousXL_v01.safetensors (or later version)
