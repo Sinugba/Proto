@@ -240,12 +240,10 @@ pony_img2img_add_person:
   positive: >
     score_9, score_8_up, score_7_up, source_realistic,
     (2persons:1.4), adult, (1boy:1.3), adult, (1girl:1.3), duo, two people,
-     same girl, same woman, preserve existing person, unchanged face,
+     same girl, same woman, new body, fit body, toned physique, 
+     perfect face, symmetrical face, detailed face, beautiful eyes
     both fully visible, standing side by side,
-    adult male, full body visible, facing forward,
-    perfect face, detailed face, beautiful eyes, short hair,
-    casual outfit, detailed skin,
-   
+    casual outfit, detailed skin,   
     masterpiece, high quality, sharp focus,
     consistent background, coherent background, same setting as original,
     natural lighting
@@ -256,6 +254,7 @@ pony_img2img_add_person:
       low quality, blurry, watermark, text, ugly, disfigured,
       changed face, altered face, different face, changed girl, changed woman,
       deformed face, bad face, asymmetrical face, warped face, distorted face,
+      melting face,
       bad eyes, cross-eyed, poorly drawn eyes, bad nose, bad mouth,
       floating, disembodied, partial body, cut off, half body,
       incoherent background, distorted background, gibberish background,

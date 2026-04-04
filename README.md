@@ -195,6 +195,52 @@ Complete ComfyUI node graph exports (including prompts and sampler settings) are
 
 ---
 
+### CLIP Token Limits and Prompt Length
+
+CLIP (the text encoder used by Stable Diffusion) enforces a **75-token hard limit per chunk**.
+
+#### What happens when your prompt is too long
+
+- ComfyUI automatically splits prompts into 75-token chunks (75, 150, 225 tokens...)
+- Tags in **chunk 1 (tokens 1–75)** have the strongest influence on the output
+- Tags in **chunk 2+ (tokens 76–150+)** have progressively weaker influence — the model pays less attention to them
+- Late-position negatives stop working reliably — e.g. safety exclusion tags that land in chunk 3 lose effectiveness
+- Conflicting signals accumulate — the model averages them and outputs a blurry compromise
+- Person-count anchors (`1boy`, `1girl`) placed late lose their contract power
+
+> **Rough rule:** 75 tokens ≈ 55–65 words. Commas count as tokens too.
+> ComfyUI shows a live token count — hover over any CLIP Text Encode node to see it.
+
+#### Priority order — Positive prompt
+
+Put the highest-impact tags first so they always land in chunk 1:
+
+| Priority | Tags |
+|----------|------|
+| 1 | Quality prefix (`score_9, score_8_up, score_7_up`) |
+| 2 | Subject count (`1boy, 1girl, adult`) |
+| 3 | Key action / scene |
+| 4 | Face and body quality tags |
+| 5 (cut first) | Background and lighting |
+
+#### Priority order — Negative prompt
+
+| Priority | Tags |
+|----------|------|
+| 1 | Safety exclusions (`child, minor, loli, elderly...`) |
+| 2 | Anatomy defects (`bad anatomy, deformed hands...`) |
+| 3 | Quality (`score_4, score_5, score_6`) |
+| 4 (cut first) | Background artifacts |
+
+#### What to do if you're over the limit
+
+- Remove tips from the CLIP Text Encode node — they are for humans reading `prompts.yaml`, not for the model
+- Cut background/lighting tags from the positive (least impactful)
+- Cut background artifact tags from the negative
+- Merge near-duplicate tags: `deformed face, bad face, warped face` → keep one or two, drop the rest
+
+---
+
 ## ComfyUI Node Wiring Reference
 
 ### Default Text-to-Image Workflow
