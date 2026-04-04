@@ -1,0 +1,8 @@
+# Model files (too large for git)
+models/
+
+# Generated images
+output/
+
+# Input files
+input/
