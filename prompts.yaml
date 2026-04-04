@@ -211,32 +211,29 @@ pony_img2img_restyle_clothing:
     - "KSampler: steps 20, cfg 7, dpmpp_2m, karras, denoise 0.55"
 
 pony_img2img_restyle_body:
-  description: "Replace/restyle body while preserving face and background — Pony Diffusion V6 XL"
+  description: "Restyle body and clothing via inpaint — Pony Diffusion V6 XL"
   positive: >
     score_9, score_8_up, score_7_up, source_realistic,
     masterpiece, high quality, detailed skin, sharp focus,
-    same person, same face, same hairstyle, same expression,
-    new body, fit body, toned body, athletic build,
-    consistent background, coherent background, same setting as original,
+    fit body, toned physique, casual outfit, standing,
     natural lighting
   negative: >
     score_4, score_5, score_6, bad anatomy, deformed hands, bad hands,
     missing fingers, extra limbs, low quality, blurry, watermark, text, ugly, disfigured,
-    different person, changed face, changed hair, changed expression,
-    deformed face, bad face, asymmetrical face, warped face,
-    bad eyes, cross-eyed, poorly drawn eyes,
+    deformed body, disproportionate body, bad torso,
     incoherent background, distorted background, gibberish background,
-    random patterns, noisy background, abstract background, corrupted,
+    corrupted, abstract background,
     child, children, kid, kids, minor, minors, teen, teenager, underage,
     loli, shota, childlike, juvenile, baby face, school age,
     old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
   tips:
-    - "Use inpaint mask on body area only — exclude face and background from the mask"
-    - "Keep denoise at 0.55-0.65: higher than clothing swap since body shape changes more"
-    - "same person, same face, same hairstyle, same expression lock identity"
-    - "Describe target body explicitly: replace 'fit body, toned body' with your goal"
-    - "different person, changed face in negative prevents face being redrawn"
-    - "KSampler: steps 25, cfg 7, dpmpp_2m, karras, denoise 0.6"
+    - "MUST use inpaint mask: mask body+clothing only, leave face and background unmasked"
+    - "Denoise 0.75-0.85 on the masked region — lower than this and nothing changes"
+    - "Describe the TARGET state directly: replace 'fit body, casual outfit' with what you want"
+    - "Example targets: muscular build, sundress, hoodie and jeans, business suit"
+    - "Do NOT add same face / same person — those block the change from happening"
+    - "Face is protected by the inpaint mask, not by prompt anchors"
+    - "KSampler: steps 25, cfg 6, dpmpp_2m, karras, denoise 0.8 (masked region only)"
     
 pony_img2img_add_person:
   description: "Add a 2nd person (boy) to an existing image via img2img — Pony Diffusion V6 XL"

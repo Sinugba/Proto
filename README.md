@@ -332,6 +332,91 @@ ControlNet extracts structure (pose, edges, depth) from a reference image and ap
 
 ---
 
+## Inpaint Mask — Body / Clothing Restyle Step-by-Step
+
+Use this when you want to change the body or clothing of a subject while keeping the face and background completely intact.
+
+### Required nodes
+
+| Node | Purpose |
+|------|---------|
+| **Load Image** | Source image to restyle |
+| **Load Image** (second instance, mask output) | Painted mask |
+| **VAE Encode (for Inpainting)** | Encodes image + mask together |
+| **KSampler** | Runs diffusion only on masked region |
+| **VAE Decode** | Decodes latent back to image |
+| **Save Image** | Saves result |
+
+### Step 1 — Paint the mask in ComfyUI
+
+1. Add a **Load Image** node and load your source image.
+2. Right-click the **Load Image** node → **Open in MaskEditor**.
+3. In the mask editor:
+   - Paint **white** over the body and clothing area you want to change.
+   - Leave the **face, hair, neck, and background black** — black regions are not touched.
+   - Use the brush size slider for precision around the face/shoulder boundary.
+4. Click **Save** — the mask is now stored on the Load Image node's mask output.
+
+### Step 2 — Wire the inpaint nodes
+
+```
+[Load Checkpoint] ──MODEL──────────────────────────────► [KSampler] model
+[Load Checkpoint] ──CLIP────► [CLIP Text Encode +] ──► [KSampler] positive
+[Load Checkpoint] ──CLIP────► [CLIP Text Encode -] ──► [KSampler] negative
+[Load Checkpoint] ──VAE─────► [VAE Encode (Inpaint)] vae
+[Load Checkpoint] ──VAE─────► [VAE Decode] vae
+
+[Load Image] ──IMAGE──► [VAE Encode (Inpaint)] pixels
+[Load Image] ──MASK───► [VAE Encode (Inpaint)] mask
+
+[VAE Encode (Inpaint)] ──LATENT──► [KSampler] latent_image
+
+[KSampler] ──LATENT──► [VAE Decode] samples
+[VAE Decode] ──IMAGE──► [Save Image]
+```
+
+> **Important:** Use **VAE Encode (for Inpainting)** — not the regular VAE Encode. The inpainting version takes a `mask` input alongside `pixels`.
+
+### Step 3 — Set KSampler values
+
+| Setting | Body restyle | Clothing only |
+|---------|-------------|---------------|
+| `denoise` | **0.8** | **0.55** |
+| `steps` | 25 | 20 |
+| `cfg_scale` | 6 | 7 |
+| `sampler` | dpmpp_2m | dpmpp_2m |
+| `scheduler` | karras | karras |
+
+- **Denoise too low** (< 0.7): nothing changes inside the mask
+- **Denoise too high** (> 0.9): face/background bleeds into the masked region
+
+### Step 4 — Write your prompt
+
+In the **positive CLIP Text Encode** node, describe what the masked region should look like:
+
+```
+score_9, score_8_up, score_7_up, source_realistic, masterpiece, high quality,
+fit body, casual outfit, standing, natural lighting
+```
+
+Replace `fit body, casual outfit` with your target — e.g.:
+- `muscular build, black hoodie and jeans`
+- `slender figure, red sundress, sleeveless`
+- `athletic wear, sports bra, leggings`
+
+Use the prompt key `pony_img2img_restyle_body` or `pony_img2img_restyle_clothing` from [`prompts.yaml`](prompts.yaml) as your starting point.
+
+### How the mask works
+
+| Mask color | Effect |
+|------------|--------|
+| **White** | Model regenerates this region using your prompt |
+| **Black** | Copied directly from the source image — unchanged |
+
+The face is protected by painting it black, not by any prompt tag. Do **not** add `same face` or `same person` to your positive prompt — those tags suppress change in the entire image, including the masked region.
+
+---
+
 ## Output
 
 Generated images are saved to:
