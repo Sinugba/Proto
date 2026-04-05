@@ -28,12 +28,13 @@ set -euo pipefail
 STACK_NAME="flux1-dev-comfyui"
 REGION="us-east-1"
 INSTANCE_TYPE="g5.xlarge"           # A10G 24 GB — recommended
+AVAILABILITY_ZONE="us-east-1b"      # g5.xlarge unavailable in us-east-1a; use 1b/1c/1d/1f
 KEY_PAIR_NAME="flux-dev"              # EC2 key pair name — ~/.ssh/flux-dev.pem must exist locally
 ALLOWED_CIDR="165.171.157.165/32"    # Your IP: e.g. 203.0.113.5/32
 SPOT_MAX_PRICE="0.50"
 EBS_VOLUME_SIZE="150"
 HF_TOKEN=""                          # HuggingFace token — leave blank to be prompted at deploy time
-S3_BUCKET_NAME="arn:aws:s3:::flux1-dev"                    # S3 bucket containing the LoRA file
+S3_BUCKET_NAME="flux1-dev"                    # S3 bucket containing the LoRA file
 
 # Local path for --upload-lora
 PROTO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -99,6 +100,7 @@ cmd_interactive() {
     read -rp "EC2 Key Pair name: " inp; KEY_PAIR_NAME="${inp:-$KEY_PAIR_NAME}"
     read -rp "Your IP CIDR (e.g. 1.2.3.4/32): " inp; ALLOWED_CIDR="${inp:-$ALLOWED_CIDR}"
     read -rp "Instance type [$INSTANCE_TYPE]: " inp; INSTANCE_TYPE="${inp:-$INSTANCE_TYPE}"
+    read -rp "Availability Zone [$AVAILABILITY_ZONE]: " inp; AVAILABILITY_ZONE="${inp:-$AVAILABILITY_ZONE}"
     read -rp "Spot max price USD/hr [$SPOT_MAX_PRICE]: " inp; SPOT_MAX_PRICE="${inp:-$SPOT_MAX_PRICE}"
     read -rp "EBS volume size GB [$EBS_VOLUME_SIZE]: " inp; EBS_VOLUME_SIZE="${inp:-$EBS_VOLUME_SIZE}"
     read -rsp "HuggingFace token (hidden, REQUIRED): " inp; HF_TOKEN="${inp:-$HF_TOKEN}"; echo ""
@@ -128,6 +130,7 @@ cmd_deploy() {
         "ParameterKey=KeyPairName,ParameterValue=$KEY_PAIR_NAME"
         "ParameterKey=AllowedCidr,ParameterValue=$ALLOWED_CIDR"
         "ParameterKey=InstanceType,ParameterValue=$INSTANCE_TYPE"
+        "ParameterKey=AvailabilityZone,ParameterValue=$AVAILABILITY_ZONE"
         "ParameterKey=SpotMaxPrice,ParameterValue=$SPOT_MAX_PRICE"
         "ParameterKey=EbsVolumeSize,ParameterValue=$EBS_VOLUME_SIZE"
     )
