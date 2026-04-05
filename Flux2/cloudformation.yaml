@@ -26,9 +26,8 @@ Parameters:
   SpotMaxPrice:
     Type: String
     Default: "0.50"
-    Description: >
-      Maximum spot price (USD/hr). g5.xlarge on-demand is ~$1.01/hr.
-      Default $0.50 gives comfortable headroom over typical spot price (~$0.35/hr).
+    Description: >-
+      Reserved for future spot use. Not currently used (on-demand mode).
 
   ModelsBucketName:
     Type: String
@@ -243,7 +242,7 @@ Resources:
         - Key: Name
           Value: !Sub "${AWS::StackName}-models"
 
-  # --- Launch Template (Spot) -----------------------------------------------
+  # --- Launch Template (On-Demand) -----------------------------------------
 
   LaunchTemplate:
     Type: AWS::EC2::LaunchTemplate
@@ -264,12 +263,6 @@ Resources:
               VolumeType: gp3
               DeleteOnTermination: true
               Encrypted: true
-        InstanceMarketOptions:
-          MarketType: spot
-          SpotOptions:
-              MaxPrice: !Ref SpotMaxPrice
-              SpotInstanceType: persistent
-              InstanceInterruptionBehavior: stop
         MetadataOptions:
           HttpTokens: required          # IMDSv2 only — security best practice
           HttpPutResponseHopLimit: 1
