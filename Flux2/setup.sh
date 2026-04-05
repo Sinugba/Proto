@@ -33,7 +33,11 @@ ALLOWED_CIDR="165.171.157.165/32"    # Your IP: e.g. 203.0.113.5/32
 SPOT_MAX_PRICE="0.50"
 EBS_VOLUME_SIZE="150"
 HF_TOKEN=""                          # HuggingFace token — leave blank to be prompted at deploy time
-LORA_URL=""                          # Direct download URL for LoRA (e.g. Civitai download URL)
+S3_BUCKET_NAME=""                    # S3 bucket containing the LoRA file
+
+# Local path for --upload-lora
+PROTO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LORA_FILE="$PROTO_ROOT/models/loras/NSFW_master_ZIT_000008766.safetensors"
 CFN_TEMPLATE="$(dirname "$0")/cloudformation.yaml"
 
 # =============================================================================
@@ -98,7 +102,7 @@ cmd_interactive() {
     read -rp "Spot max price USD/hr [$SPOT_MAX_PRICE]: " inp; SPOT_MAX_PRICE="${inp:-$SPOT_MAX_PRICE}"
     read -rp "EBS volume size GB [$EBS_VOLUME_SIZE]: " inp; EBS_VOLUME_SIZE="${inp:-$EBS_VOLUME_SIZE}"
     read -rsp "HuggingFace token (hidden, REQUIRED): " inp; HF_TOKEN="${inp:-$HF_TOKEN}"; echo ""
-    read -rp "LoRA direct download URL (optional, leave blank to upload manually): " inp; LORA_URL="${inp:-$LORA_URL}"
+    read -rp "S3 bucket name for LoRA (leave blank to upload manually later): " inp; S3_BUCKET_NAME="${inp:-$S3_BUCKET_NAME}"
 
     echo ""
     cmd_deploy
@@ -127,8 +131,8 @@ cmd_deploy() {
         "ParameterKey=SpotMaxPrice,ParameterValue=$SPOT_MAX_PRICE"
         "ParameterKey=EbsVolumeSize,ParameterValue=$EBS_VOLUME_SIZE"
     )
-    [[ -n "$HF_TOKEN"  ]] && PARAMS+=("ParameterKey=HfToken,ParameterValue=$HF_TOKEN")
-    [[ -n "$LORA_URL"  ]] && PARAMS+=("ParameterKey=LoraUrl,ParameterValue=$LORA_URL")
+    [[ -n "$HF_TOKEN"       ]] && PARAMS+=("ParameterKey=HfToken,ParameterValue=$HF_TOKEN")
+    [[ -n "$S3_BUCKET_NAME" ]] && PARAMS+=("ParameterKey=ModelsBucketName,ParameterValue=$S3_BUCKET_NAME")
 
     # Deploy (create or update)
     STACK_STATUS=$(aws cloudformation describe-stacks \
@@ -163,6 +167,16 @@ cmd_deploy() {
     fi
 
     cmd_status
+}
+
+cmd_upload_lora() {
+    require_config "$S3_BUCKET_NAME" "S3_BUCKET_NAME"
+    [[ -f "$LORA_FILE" ]] || error "LoRA not found at: $LORA_FILE"
+    info "Uploading LoRA to s3://$S3_BUCKET_NAME/models/loras/..."
+    aws s3 cp "$LORA_FILE" \
+        "s3://$S3_BUCKET_NAME/models/loras/$(basename "$LORA_FILE")" \
+        --region "$REGION"
+    success "LoRA uploaded."
 }
 
 cmd_status() {
@@ -277,7 +291,7 @@ usage() {
     echo ""
     echo "  (no args)          Interactive setup wizard"
     echo "  --deploy           Deploy using values in the CONFIGURATION section"
-
+  echo "  --upload-lora      Upload LoRA file to S3 bucket"
     echo "  --status           Show stack, instance, and ComfyUI URL"
     echo "  --connect          SSH into the instance"
     echo "  --logs             Tail the setup log via SSM"
@@ -290,6 +304,7 @@ usage() {
 
 case "${1:-}" in
     --deploy)         cmd_deploy ;;
+    --upload-lora)    cmd_upload_lora ;;
     --status)         cmd_status ;;
     --connect)        cmd_connect ;;
     --logs)           cmd_logs ;;

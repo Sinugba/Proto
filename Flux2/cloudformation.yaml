@@ -30,13 +30,13 @@ Parameters:
       Maximum spot price (USD/hr). g5.xlarge on-demand is ~$1.01/hr.
       Default $0.50 gives comfortable headroom over typical spot price (~$0.35/hr).
 
-  LoraUrl:
+  ModelsBucketName:
     Type: String
     Default: ""
     Description: >
-      (Optional) Direct download URL for the LoRA file (e.g. a Civitai download URL).
-      The file will be saved as NSFW_master_ZIT_000008766.safetensors in /data/models/loras/.
-      Leave blank to upload the LoRA manually after the instance is running.
+      S3 bucket name containing the LoRA file.
+      The instance will download models/loras/NSFW_master_ZIT_000008766.safetensors
+      from this bucket on first boot. Upload with: ./setup.sh --upload-lora
 
   HfToken:
     Type: String
@@ -69,9 +69,9 @@ Parameters:
 # Conditions
 # ---------------------------------------------------------------------------
 Conditions:
-  HasLoraUrl:  !Not [!Equals [!Ref LoraUrl, ""]]
-  HasHfToken:  !Not [!Equals [!Ref HfToken, ""]]
-  NeedLowVram: !Equals [!Ref InstanceType, "g4dn.xlarge"]
+  HasS3Bucket:  !Not [!Equals [!Ref ModelsBucketName, ""]]
+  HasHfToken:   !Not [!Equals [!Ref HfToken, ""]]
+  NeedLowVram:  !Equals [!Ref InstanceType, "g4dn.xlarge"]
 
 # ---------------------------------------------------------------------------
 # Mappings — latest Deep Learning AMI (Amazon Linux 2023, GPU)
@@ -196,6 +196,21 @@ Resources:
             Action: sts:AssumeRole
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore  # Session Manager access
+      Policies:
+        - PolicyName: S3LoraReadPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource: !If
+                  - HasS3Bucket
+                  - - !Sub "arn:aws:s3:::${ModelsBucketName}"
+                    - !Sub "arn:aws:s3:::${ModelsBucketName}/models/loras/*"
+                  - - !Sub "arn:aws:s3:::${AWS::StackName}-placeholder"
+                    - !Sub "arn:aws:s3:::${AWS::StackName}-placeholder/*"
 
   InstanceProfile:
     Type: AWS::IAM::InstanceProfile
@@ -390,9 +405,9 @@ Resources:
               echo "=== Setup complete ==="
               echo "ComfyUI available at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8188"
             - LORA_DOWNLOAD_CMD: !If
-                - HasLoraUrl
-                - !Sub "curl -fL '${LoraUrl}' -o /data/models/loras/NSFW_master_ZIT_000008766.safetensors"
-                - "echo 'No LoRA URL configured \u2014 upload NSFW_master_ZIT_000008766.safetensors to /data/models/loras/ manually'"
+                - HasS3Bucket
+                - !Sub "aws s3 cp s3://${ModelsBucketName}/models/loras/NSFW_master_ZIT_000008766.safetensors /data/models/loras/NSFW_master_ZIT_000008766.safetensors"
+                - "echo 'No S3 bucket configured \u2014 upload NSFW_master_ZIT_000008766.safetensors to /data/models/loras/ manually'"
               EXTRA_ARGS_VALUE: !If
                 - NeedLowVram
                 - "--lowvram"
