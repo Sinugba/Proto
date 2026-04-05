@@ -2,8 +2,14 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   FLUX.1-dev + LoRA on AWS EC2 g5.xlarge (A10G 24 GB VRAM).
   Provisions: VPC, public subnet, security group, IAM instance profile,
-  EBS volume for models, and a spot EC2 instance running ComfyUI via Docker.
-  ComfyUI is accessible on port 8188 from your workstation IP only.
+  EBS volume for models, and an on-demand EC2 instance running ComfyUI directly
+  via Python + systemd (no Docker). ComfyUI is accessible on port 8188.
+  Notes:
+    - Root filesystem is XFS — growpart + xfs_growfs used (not resize2fs)
+    - Python 3.11 required for ComfyUI (comfy-kitchen>=0.2.8 needs Python 3.10+)
+    - PyTorch venv installed on /data to avoid filling the 100 GB root volume
+    - Models stored on retained EBS volume (/data) — survive stack delete
+    - 20 GB swapfile on /data required: g5.xlarge has 16 GB RAM, unet is ~17 GB (mmap needs swap)
 
 # ---------------------------------------------------------------------------
 # Parameters
@@ -267,7 +273,7 @@ Resources:
         BlockDeviceMappings:
           - DeviceName: /dev/xvda
             Ebs:
-              VolumeSize: 75       # root volume — OS + Docker images (min 75 GB for this AMI)
+              VolumeSize: 100       # root volume — OS + system packages (min 75 GB for this AMI)
               VolumeType: gp3
               DeleteOnTermination: true
               Encrypted: true
@@ -290,20 +296,19 @@ Resources:
               timeout 120 bash -c 'until nvidia-smi &>/dev/null; do sleep 5; done'
               nvidia-smi
 
-              # --- Install Docker ---
-              dnf install -y docker git
-              systemctl enable --now docker
-              usermod -aG docker ec2-user
+              # --- Grow root partition to full allocated EBS size ---
+              # The Deep Learning AMI snapshot is smaller than the allocated VolumeSize.
+              # Root filesystem is XFS — must use xfs_growfs, NOT resize2fs.
+              growpart /dev/nvme0n1 1 || true
+              xfs_growfs /
+              df -h /
 
-              # --- Install NVIDIA Container Toolkit ---
-              curl -fsSL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
-                > /etc/yum.repos.d/nvidia-container-toolkit.repo
-              dnf install -y nvidia-container-toolkit
-              nvidia-ctk runtime configure --runtime=docker
-              systemctl restart docker
+              # --- Install dependencies ---
+              # python3.11 required: ComfyUI's comfy-kitchen>=0.2.8 needs Python 3.10+
+              # The AMI ships Python 3.9 as default — install 3.11 explicitly.
+              dnf install -y git python3.11 python3.11-devel gcc
 
               # --- Attach and mount EBS data volume ---
-              # Wait for volume to attach (attached via separate resource)
               DEVICE=/dev/nvme1n1
               MOUNT=/data
               echo "Waiting for $DEVICE..."
@@ -319,10 +324,25 @@ Resources:
               # --- Create model directories ---
               mkdir -p $MOUNT/models/{unet,clip,vae,loras,checkpoints}
               mkdir -p $MOUNT/{input,output,custom_nodes,workflows}
+              # Clear stale HF download locks from any aborted prior runs.
+              # Without this, re-runs fail with: PermissionError [Errno 13] *.lock
+              find $MOUNT -name "*.lock" -delete 2>/dev/null || true
               chown -R ec2-user:ec2-user $MOUNT
 
-              # --- Install HuggingFace Hub ---
-              python3 -m pip install -q --upgrade "huggingface_hub" "hf_transfer"
+              # --- Add swap on EBS ---
+              # g5.xlarge has 16 GB RAM but the FLUX unet is ~17 GB.
+              # safetensors mmaps the full file into CPU address space on load,
+              # which fails with ENOMEM without swap. 20 GB on /data is sufficient.
+              if [[ ! -f $MOUNT/swapfile ]]; then
+                fallocate -l 20G $MOUNT/swapfile
+                chmod 600 $MOUNT/swapfile
+                mkswap $MOUNT/swapfile
+              fi
+              swapon $MOUNT/swapfile || true
+              echo "$MOUNT/swapfile none swap sw 0 0" >> /etc/fstab
+
+              # --- Install HuggingFace Hub (python3.11 for consistency with venv) ---
+              python3.11 -m pip install -q --upgrade "huggingface_hub" "hf_transfer"
 
               # Write download helper using the Python API (avoids CLI path issues)
               printf '%s\n' \
@@ -334,15 +354,28 @@ Resources:
                 '    hf_hub_download(repo_id=repo, filename=fname, local_dir=local_dir, token=token)' \
                 > /tmp/hf_dl.py
 
-              # --- Create working directory for docker compose ---
-              # Workflows are loaded via ComfyUI web UI — no repo clone needed.
-              REPO_DIR=/home/ec2-user/comfyui
-              mkdir -p $REPO_DIR
+              # --- Clone ComfyUI ---
+              COMFYUI_DIR=/opt/ComfyUI
+              git clone https://github.com/comfyanonymous/ComfyUI.git $COMFYUI_DIR
 
-              # Symlink model dirs from EBS mount
+              # Clone ComfyUI Manager into the EBS custom_nodes dir
+              git clone https://github.com/ltdrdata/ComfyUI-Manager.git \
+                $MOUNT/custom_nodes/ComfyUI-Manager
+
+              # Symlink all data dirs from EBS into ComfyUI (models, inputs, outputs, custom nodes)
               for d in models input output custom_nodes; do
-                ln -sfn $MOUNT/$d $REPO_DIR/$d
+                rm -rf $COMFYUI_DIR/$d
+                ln -s $MOUNT/$d $COMFYUI_DIR/$d
               done
+              chown -R ec2-user:ec2-user $COMFYUI_DIR
+
+              # --- Install PyTorch + ComfyUI requirements into venv on EBS ---
+              # MUST install to /data/venv — PyTorch (~3 GB) + deps would fill the root volume.
+              # python3.11 required for comfy-kitchen>=0.2.8 (Python 3.10+ constraint).
+              python3.11 -m venv /data/venv
+              /data/venv/bin/pip install -q --upgrade pip
+              /data/venv/bin/pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+              /data/venv/bin/pip install -r $COMFYUI_DIR/requirements.txt
 
               # --- Download models from HuggingFace ---
               # IMPORTANT: HF token must have accepted the BFL license at:
@@ -353,62 +386,62 @@ Resources:
                 exit 1
               fi
 
-              echo "Downloading FLUX.1-dev unet (fp8)..."
-              python3 /tmp/hf_dl.py "Comfy-Org/flux1-dev" \
+              echo "Downloading FLUX.1-dev unet (fp8, ~17 GB)..."
+              python3.11 /tmp/hf_dl.py "Comfy-Org/flux1-dev" \
                 "$MOUNT/models/unet" "${HfToken}" \
                 "flux1-dev-fp8.safetensors"
 
-              echo "Downloading CLIP encoders..."
-              python3 /tmp/hf_dl.py "comfyanonymous/flux_text_encoders" \
+              echo "Downloading CLIP encoders (~10 GB total)..."
+              python3.11 /tmp/hf_dl.py "comfyanonymous/flux_text_encoders" \
                 "$MOUNT/models/clip" "${HfToken}" \
                 "clip_l.safetensors" "t5xxl_fp8_e4m3fn.safetensors"
 
-              echo "Downloading VAE (ae.safetensors)..."
-              python3 /tmp/hf_dl.py "black-forest-labs/FLUX.1-dev" \
+              echo "Downloading VAE (ae.safetensors, ~335 MB)..."
+              python3.11 /tmp/hf_dl.py "black-forest-labs/FLUX.1-dev" \
                 "$MOUNT/models/vae" "${HfToken}" \
                 "ae.safetensors"
 
               # --- Download LoRA ---
               ${LORA_DOWNLOAD_CMD}
 
-              # --- Write docker-compose.yaml ---
-              cat > $REPO_DIR/docker-compose.yaml << 'COMPOSE'
-              services:
-                comfyui:
-                  image: ghcr.io/ai-dock/comfyui:latest-cuda
-                  restart: unless-stopped
-                  ports:
-                    - "1111:1111"
-                    - "8188:8188"
-                  volumes:
-                    - /data/models:/opt/ComfyUI/models
-                    - /data/input:/opt/ComfyUI/input
-                    - /data/output:/opt/ComfyUI/output
-                    - /data/custom_nodes:/opt/ComfyUI/custom_nodes
-                  environment:
-                    - NVIDIA_VISIBLE_DEVICES=all
-                    - NVIDIA_DRIVER_CAPABILITIES=all
-                    - WEB_AUTHENTICATION=false
-                  deploy:
-                    resources:
-                      reservations:
-                        devices:
-                          - driver: nvidia
-                            count: all
-                            capabilities: [gpu]
-              COMPOSE
+              # Final ownership fix — HF downloads create .cache dirs as root
+              chown -R ec2-user:ec2-user $MOUNT
 
-              # --- Start ComfyUI ---
-              cd $REPO_DIR
-              docker compose pull
-              docker compose up -d
+              # --- Install comfyui_controlnet_aux ---
+              if [ ! -d "$MOUNT/custom_nodes/comfyui_controlnet_aux" ]; then
+                git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git $MOUNT/custom_nodes/comfyui_controlnet_aux
+                /data/venv/bin/pip install -q -r $MOUNT/custom_nodes/comfyui_controlnet_aux/requirements.txt
+              fi
+
+              # --- Create systemd service ---
+              cat > /etc/systemd/system/comfyui.service << 'SERVICE'
+[Unit]
+Description=ComfyUI
+After=network.target
+
+[Service]
+Type=simple
+User=ec2-user
+WorkingDirectory=/home/ec2-user/ComfyUI
+ExecStart=/data/venv/bin/python main.py --listen 0.0.0.0 --port 8188
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+SERVICE
+
+              systemctl daemon-reload
+              systemctl enable --now comfyui
 
               echo "=== Setup complete ==="
               echo "ComfyUI available at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8188"
             - LORA_DOWNLOAD_CMD: !If
                 - HasS3Bucket
                 - !Sub "aws s3 cp s3://${ModelsBucketName}/models/loras/NSFW_master_ZIT_000008766.safetensors /data/models/loras/NSFW_master_ZIT_000008766.safetensors"
-                - "echo 'No S3 bucket configured \u2014 upload NSFW_master_ZIT_000008766.safetensors to /data/models/loras/ manually'"
+                - "echo 'No S3 bucket configured - upload NSFW_master_ZIT_000008766.safetensors to /data/models/loras/ manually'"
 
   # --- EC2 Instance ---------------------------------------------------------
 

@@ -614,3 +614,55 @@ flux_ksampler_settings:
       Schnell img2img: keep denoise at 0.5-0.7. Higher = more change.
       FLUX.1 does not use an inpaint model the same way SDXL does;
       use ComfyUI inpaint nodes with a masked latent for region control.
+
+# ---------------------------------------------------------------------------
+# FLUX.1-dev — LORA + CONTROLNET POSE (workflow: flux1-dev-lora-controlnet-pose.json)
+# Nodes: UNETLoader → LoraLoader → ModelSamplingFlux → ControlNetApplyAdvanced → KSampler
+# LoRA: NSFW_master_ZIT_000008766.safetensors (strength 0.75)
+# ControlNet: flux-dev-controlnet-union.safetensors (strength 0.7)
+# ---------------------------------------------------------------------------
+
+flux_lora_pose_test:
+  description: "Test prompt — validates LoRA style + ControlNet pose adherence together"
+  positive: >
+    A photorealistic portrait of an adult woman in her 20s standing confidently
+    in a warmly lit studio. She has long dark hair, sharp facial features,
+    detailed eyes, flawless skin with natural texture. She wears a fitted
+    black outfit. The background is a clean neutral gradient.
+    Cinematic lighting, shallow depth of field, high detail, sharp focus,
+    professional photography.
+  negative: >
+    blurry, low quality, watermark, text, bad anatomy, deformed hands,
+    bad hands, missing fingers, extra limbs, fused fingers, mutated,
+    ugly, disfigured, overexposed, underexposed, cartoon, painting,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
+  tips:
+    - "This prompt is designed to clearly show LoRA style influence — compare output to flux_portrait without LoRA"
+    - "If pose is ignored: increase ControlNetApplyAdvanced strength from 0.7 → 0.85"
+    - "If LoRA overpowers the portrait style: reduce LoraLoader strength from 0.75 → 0.55"
+    - "If pose looks stiff/unnatural: narrow ControlNet end_percent from 1.0 → 0.7"
+    - "Upload a clear full-body or half-body pose photo to the LoadImage node — avoid cropped faces"
+    - "KSampler: steps 20, cfg 3.5, euler, simple, seed 42 for reproducible baseline test"
+
+flux_lora_pose_outdoor:
+  description: "Outdoor lifestyle shot — LoRA style + pose control"
+  positive: >
+    A photorealistic full-body photograph of an adult woman in her 20s
+    outdoors in a sunlit urban street. She wears a casual summer outfit,
+    long brown wavy hair, natural makeup. Warm golden hour light, bokeh
+    background of blurred city buildings. Sharp focus on subject,
+    cinematic color grading, high detail skin texture, professional fashion photography.
+  negative: >
+    blurry, low quality, watermark, text, bad anatomy, deformed hands,
+    bad hands, missing fingers, extra limbs, fused fingers, mutated,
+    ugly, disfigured, overexposed, flat lighting, cartoon, painting,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
+  tips:
+    - "Good test for LoRA influence on skin tone and facial feature style outdoors"
+    - "If background bleeds into subject: reduce ControlNet strength to 0.6"
+    - "Use a standing full-body reference pose photo for best results with this prompt"
+    - "KSampler: steps 20, cfg 3.5, euler, simple"

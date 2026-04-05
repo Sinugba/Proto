@@ -14,7 +14,9 @@
 #   ./setup.sh --status               # check stack/instance status
 #   ./setup.sh --connect              # SSH into the instance
 #   ./setup.sh --logs                 # tail the setup log via SSM
-#   ./setup.sh --stop                 # stop instance (preserves EBS + models)
+#   ./setup.sh --shutdown             # gracefully stop ComfyUI then stop instance
+#   ./setup.sh --shutdown             # gracefully stop ComfyUI then stop instance
+#   ./setup.sh --stop                 # stop instance immediately (preserves EBS + models)
 #   ./setup.sh --start                # start a stopped instance
 #   ./setup.sh --teardown             # DELETE stack (EBS volume is retained)
 #
@@ -277,6 +279,33 @@ cmd_stop() {
     success "Instance stopping. Models on EBS are safe."
 }
 
+cmd_shutdown() {
+    require_config "$KEY_PAIR_NAME" "KEY_PAIR_NAME"
+    INSTANCE_ID="$(get_instance_id)"
+    [[ -n "$INSTANCE_ID" ]] || error "No instance found."
+    PUBLIC_IP="$(get_public_ip "$INSTANCE_ID")"
+
+    if [[ -n "$PUBLIC_IP" && "$PUBLIC_IP" != "None" ]]; then
+        info "Gracefully stopping ComfyUI service on $PUBLIC_IP..."
+        ssh -i "$HOME/.ssh/${KEY_PAIR_NAME}.pem" \
+            -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            -o BatchMode=yes \
+            "ec2-user@$PUBLIC_IP" \
+            "sudo systemctl stop comfyui 2>/dev/null || pkill -f 'main.py' 2>/dev/null || true; sync" \
+            2>/dev/null && success "ComfyUI stopped cleanly." \
+            || warn "Could not reach instance via SSH — stopping anyway."
+    else
+        warn "Instance has no public IP — stopping directly."
+    fi
+
+    info "Stopping EC2 instance $INSTANCE_ID..."
+    aws ec2 stop-instances --instance-ids "$INSTANCE_ID" --region "$REGION" \
+        --query "StoppingInstances[0].CurrentState.Name" --output text
+    success "Instance stopping. EBS volume and models are safe."
+    info "To resume: ./setup.sh --start"
+}
+
 cmd_start() {
     INSTANCE_ID="$(get_instance_id)"
     [[ -n "$INSTANCE_ID" ]] || error "No instance found."
@@ -340,6 +369,7 @@ case "${1:-}" in
     --status)         cmd_status ;;
     --connect)        cmd_connect ;;
     --logs)           cmd_logs ;;
+    --shutdown)        cmd_shutdown ;;
     --stop)           cmd_stop ;;
     --start)          cmd_start ;;
     --teardown)       cmd_teardown ;;
