@@ -475,4 +475,4 @@ Outputs:
 
   ModelsVolumeId:
     Description: EBS volume ID for models (retained on stack delete)
-    Value: !Ref ModelsVolume
+    Value: !If [HasExistingVolume, !Ref ExistingVolumeId, !Ref ModelsVolume]
