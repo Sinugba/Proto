@@ -1,0 +1,450 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  FLUX.1-dev + LoRA on AWS EC2 g5.xlarge (A10G 24 GB VRAM).
+  Provisions: VPC, public subnet, security group, IAM instance profile,
+  EBS volume for models, and a spot EC2 instance running ComfyUI via Docker.
+  ComfyUI is accessible on port 8188 from your workstation IP only.
+
+# ---------------------------------------------------------------------------
+# Parameters
+# ---------------------------------------------------------------------------
+Parameters:
+
+  AllowedCidr:
+    Type: String
+    Description: >
+      Your workstation public IP in CIDR notation (e.g. 203.0.113.5/32).
+      Only this address can reach ComfyUI (port 8188) and SSH (port 22).
+      Find yours at https://checkip.amazonaws.com
+    AllowedPattern: "^(\\d{1,3}\\.){3}\\d{1,3}/\\d{1,2}$"
+    ConstraintDescription: Must be a valid IPv4 CIDR block.
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 key pair for SSH access. Must already exist in this region.
+
+  SpotMaxPrice:
+    Type: String
+    Default: "0.50"
+    Description: >
+      Maximum spot price (USD/hr). g5.xlarge on-demand is ~$1.01/hr.
+      Default $0.50 gives comfortable headroom over typical spot price (~$0.35/hr).
+
+  LoraUrl:
+    Type: String
+    Default: ""
+    Description: >
+      (Optional) Direct download URL for the LoRA file (e.g. a Civitai download URL).
+      The file will be saved as NSFW_master_ZIT_000008766.safetensors in /data/models/loras/.
+      Leave blank to upload the LoRA manually after the instance is running.
+
+  HfToken:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: >
+      HuggingFace token (REQUIRED). Used to download all models: FLUX.1-dev unet,
+      CLIP encoders, and ae.safetensors VAE. Your token must have accepted the BFL
+      license at huggingface.co/black-forest-labs/FLUX.1-dev.
+      Store in AWS Secrets Manager for production use.
+
+  EbsVolumeSize:
+    Type: Number
+    Default: 150
+    MinValue: 100
+    Description: Size of the EBS gp3 data volume in GB. 150 GB recommended (models ~28 GB + room).
+
+  InstanceType:
+    Type: String
+    Default: g5.xlarge
+    AllowedValues:
+      - g5.xlarge       # A10G 24 GB  — recommended, best price/performance
+      - g6.xlarge       # L4  24 GB   — alternative
+      - g4dn.xlarge     # T4  16 GB   — budget option, needs --lowvram
+    Description: >
+      GPU instance type. g5.xlarge (A10G 24 GB) is recommended.
+      g4dn.xlarge (T4 16 GB) requires --lowvram and will be slower.
+
+# ---------------------------------------------------------------------------
+# Conditions
+# ---------------------------------------------------------------------------
+Conditions:
+  HasLoraUrl:  !Not [!Equals [!Ref LoraUrl, ""]]
+  HasHfToken:  !Not [!Equals [!Ref HfToken, ""]]
+  NeedLowVram: !Equals [!Ref InstanceType, "g4dn.xlarge"]
+
+# ---------------------------------------------------------------------------
+# Mappings — latest Deep Learning AMI (Amazon Linux 2023, GPU)
+# Update AMI IDs if deploying in other regions.
+# Source: aws ec2 describe-images --owners amazon \
+#   --filters "Name=name,Values=Deep Learning Base OSS Nvidia Driver GPU AMI (Amazon Linux 2023)*"
+# ---------------------------------------------------------------------------
+Mappings:
+  RegionAMI:
+    us-east-1:
+      AMI: ami-005fc0f236362e99f   # Deep Learning Base OSS Nvidia Driver - AL2023
+    us-west-2:
+      AMI: ami-0b20a6f09484773af
+    eu-west-1:
+      AMI: ami-0c1bc246476a5572b
+    ap-southeast-1:
+      AMI: ami-0abcdef1234567890   # Replace with correct AMI for your region
+    ap-northeast-1:
+      AMI: ami-0fedcba9876543210   # Replace with correct AMI for your region
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+Resources:
+
+  # --- Networking -----------------------------------------------------------
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-vpc"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-igw"
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-public-subnet"
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-rt"
+
+  DefaultRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref RouteTable
+
+  # --- Security Group -------------------------------------------------------
+
+  SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "FLUX.1 ComfyUI — restricted to workstation IP only"
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref AllowedCidr
+          Description: SSH from workstation
+        - IpProtocol: tcp
+          FromPort: 8188
+          ToPort: 8188
+          CidrIp: !Ref AllowedCidr
+          Description: ComfyUI from workstation
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: All outbound (HuggingFace downloads, apt, Docker pull)
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-sg"
+
+  # --- IAM ------------------------------------------------------------------
+
+  InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AWS::StackName}-instance-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore  # Session Manager access
+
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: !Sub "${AWS::StackName}-instance-profile"
+      Roles:
+        - !Ref InstanceRole
+
+  # --- EBS Data Volume ------------------------------------------------------
+  # Separate from root volume so models survive instance replacement.
+
+  ModelsVolume:
+    Type: AWS::EC2::Volume
+    DeletionPolicy: Retain   # IMPORTANT: retain models on stack delete
+    Properties:
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      Size: !Ref EbsVolumeSize
+      VolumeType: gp3
+      Throughput: 250        # MB/s — gp3 baseline; increase to 1000 for faster model loads
+      Iops: 3000
+      Encrypted: true
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-models"
+
+  # --- Launch Template (Spot) -----------------------------------------------
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub "${AWS::StackName}-lt"
+      LaunchTemplateData:
+        ImageId: !FindInMap [RegionAMI, !Ref "AWS::Region", AMI]
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyPairName
+        IamInstanceProfile:
+          Arn: !GetAtt InstanceProfile.Arn
+        SecurityGroupIds:
+          - !Ref SecurityGroup
+        BlockDeviceMappings:
+          - DeviceName: /dev/xvda
+            Ebs:
+              VolumeSize: 60       # root volume — OS + Docker images
+              VolumeType: gp3
+              DeleteOnTermination: true
+              Encrypted: true
+        InstanceMarketOptions:
+          MarketType: spot
+          SpotOptions:
+              MaxPrice: !Ref SpotMaxPrice
+              SpotInstanceType: persistent
+              InstanceInterruptionBehavior: stop
+        MetadataOptions:
+          HttpTokens: required          # IMDSv2 only — security best practice
+          HttpPutResponseHopLimit: 1
+        UserData:
+          Fn::Base64: !Sub
+            - |
+              #!/bin/bash
+              set -euo pipefail
+              exec > >(tee /var/log/flux-setup.log | logger -t flux-setup) 2>&1
+
+              echo "=== FLUX.1-dev ComfyUI Setup ==="
+              echo "Instance: $(curl -s http://169.254.169.254/latest/meta-data/instance-type)"
+              echo "Region:   ${AWS::Region}"
+
+              # --- Wait for NVIDIA driver ---
+              echo "Waiting for NVIDIA driver..."
+              timeout 120 bash -c 'until nvidia-smi &>/dev/null; do sleep 5; done'
+              nvidia-smi
+
+              # --- Install Docker ---
+              dnf install -y docker git
+              systemctl enable --now docker
+              usermod -aG docker ec2-user
+
+              # --- Install NVIDIA Container Toolkit ---
+              curl -fsSL https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
+                > /etc/yum.repos.d/nvidia-container-toolkit.repo
+              dnf install -y nvidia-container-toolkit
+              nvidia-ctk runtime configure --runtime=docker
+              systemctl restart docker
+
+              # --- Attach and mount EBS data volume ---
+              # Wait for volume to attach (attached via separate resource)
+              DEVICE=/dev/nvme1n1
+              MOUNT=/data
+              echo "Waiting for $DEVICE..."
+              timeout 120 bash -c "until [ -b $DEVICE ]; do sleep 3; done"
+              if ! blkid $DEVICE; then
+                echo "Formatting $DEVICE (first boot)..."
+                mkfs.ext4 -F $DEVICE
+              fi
+              mkdir -p $MOUNT
+              mount $DEVICE $MOUNT
+              echo "$DEVICE $MOUNT ext4 defaults,nofail 0 2" >> /etc/fstab
+
+              # --- Create model directories ---
+              mkdir -p $MOUNT/models/{unet,clip,vae,loras,checkpoints}
+              mkdir -p $MOUNT/{input,output,custom_nodes,workflows}
+              chown -R ec2-user:ec2-user $MOUNT
+
+              # --- Install HuggingFace Hub CLI ---
+              python3 -m pip install -q --upgrade "huggingface_hub[cli]"
+
+              # --- Clone Proto repo ---
+              REPO_DIR=/home/ec2-user/Proto
+              if [ ! -d "$REPO_DIR" ]; then
+                echo "Cloning Proto repo..."
+                git clone https://github.com/Sinugba/Proto.git $REPO_DIR
+              else
+                git -C $REPO_DIR pull --ff-only
+              fi
+
+              # Copy workflows from repo to EBS before symlinking
+              cp -n $REPO_DIR/workflows/*.json $MOUNT/workflows/ 2>/dev/null || true
+
+              # Symlink model dirs from repo expected path to EBS mount
+              for d in models input output custom_nodes workflows; do
+                rm -rf $REPO_DIR/$d
+                ln -sf $MOUNT/$d $REPO_DIR/$d
+              done
+
+              # --- Download models from HuggingFace ---
+              # IMPORTANT: HF token must have accepted the BFL license at:
+              #   https://huggingface.co/black-forest-labs/FLUX.1-dev
+              # HfToken is embedded in UserData (base64). Use Secrets Manager for production.
+              if [[ -z "${HfToken}" ]]; then
+                echo "ERROR: HfToken parameter is required. Cannot download models."
+                exit 1
+              fi
+
+              echo "Downloading FLUX.1-dev unet (fp8)..."
+              huggingface-cli download Comfy-Org/flux1-dev \
+                flux1-dev-fp8-e4m3fn.safetensors \
+                --local-dir $MOUNT/models/unet \
+                --token "${HfToken}"
+
+              echo "Downloading CLIP encoders..."
+              huggingface-cli download comfyanonymous/flux_text_encoders \
+                clip_l.safetensors t5xxl_fp8_e4m3fn.safetensors \
+                --local-dir $MOUNT/models/clip \
+                --token "${HfToken}"
+
+              echo "Downloading VAE (ae.safetensors)..."
+              huggingface-cli download black-forest-labs/FLUX.1-dev \
+                ae.safetensors \
+                --local-dir $MOUNT/models/vae \
+                --token "${HfToken}"
+
+              # --- Download LoRA ---
+              ${LORA_DOWNLOAD_CMD}
+
+              # --- Download ComfyUI-GGUF custom node ---
+              GGUF_NODE=$MOUNT/custom_nodes/ComfyUI-GGUF
+              if [ ! -d "$GGUF_NODE" ]; then
+                git clone https://github.com/city96/ComfyUI-GGUF.git $GGUF_NODE
+              else
+                git -C $GGUF_NODE pull --ff-only
+              fi
+
+              # --- Write docker-compose.yaml ---
+              cat > $REPO_DIR/docker-compose.yaml << 'COMPOSE'
+              services:
+                comfyui:
+                  build: .
+                  image: proto-comfyui:local
+                  restart: unless-stopped
+                  ports:
+                    - "8188:8188"
+                  volumes:
+                    - /data/models:/opt/ComfyUI/models
+                    - /data/input:/opt/ComfyUI/input
+                    - /data/output:/opt/ComfyUI/output
+                    - /data/custom_nodes:/opt/ComfyUI/custom_nodes
+                  environment:
+                    - EXTRA_ARGS=${EXTRA_ARGS_VALUE}
+                  deploy:
+                    resources:
+                      reservations:
+                        devices:
+                          - driver: nvidia
+                            count: all
+                            capabilities: [gpu]
+              COMPOSE
+
+              # --- Build and start ComfyUI ---
+              cd $REPO_DIR
+              docker compose build --pull
+              docker compose up -d
+
+              echo "=== Setup complete ==="
+              echo "ComfyUI available at http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8188"
+            - LORA_DOWNLOAD_CMD: !If
+                - HasLoraUrl
+                - !Sub "curl -fL '${LoraUrl}' -o /data/models/loras/NSFW_master_ZIT_000008766.safetensors"
+                - "echo 'No LoRA URL configured \u2014 upload NSFW_master_ZIT_000008766.safetensors to /data/models/loras/ manually'"
+              EXTRA_ARGS_VALUE: !If
+                - NeedLowVram
+                - "--lowvram"
+                - ""
+
+  # --- EC2 Instance ---------------------------------------------------------
+
+  Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      Tags:
+        - Key: Name
+          Value: !Sub "${AWS::StackName}-comfyui"
+
+  # --- Attach EBS to Instance -----------------------------------------------
+
+  VolumeAttachment:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      InstanceId: !Ref Instance
+      VolumeId: !Ref ModelsVolume
+      Device: /dev/sdf      # shown as /dev/nvme1n1 inside AL2023
+
+# ---------------------------------------------------------------------------
+# Outputs
+# ---------------------------------------------------------------------------
+Outputs:
+
+  InstanceId:
+    Description: EC2 instance ID
+    Value: !Ref Instance
+
+  PublicIP:
+    Description: Public IP address of the instance
+    Value: !GetAtt Instance.PublicIp
+
+  ComfyUIURL:
+    Description: ComfyUI URL (open in browser once setup completes ~5-10 min)
+    Value: !Sub "http://${Instance.PublicIp}:8188"
+
+  SSHCommand:
+    Description: SSH command to connect
+    Value: !Sub "ssh -i ~/.ssh/${KeyPairName}.pem ec2-user@${Instance.PublicIp}"
+
+  SetupLog:
+    Description: Watch setup progress on the instance
+    Value: "sudo tail -f /var/log/flux-setup.log"
+
+  ModelsVolumeId:
+    Description: EBS volume ID for models (retained on stack delete)
+    Value: !Ref ModelsVolume
