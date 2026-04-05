@@ -33,7 +33,7 @@ ALLOWED_CIDR="165.171.157.165/32"    # Your IP: e.g. 203.0.113.5/32
 SPOT_MAX_PRICE="0.50"
 EBS_VOLUME_SIZE="150"
 HF_TOKEN=""                          # HuggingFace token — leave blank to be prompted at deploy time
-S3_BUCKET_NAME=""                    # S3 bucket containing the LoRA file
+S3_BUCKET_NAME="arn:aws:s3:::flux1-dev"                    # S3 bucket containing the LoRA file
 
 # Local path for --upload-lora
 PROTO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
