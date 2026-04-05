@@ -253,7 +253,7 @@ Resources:
         BlockDeviceMappings:
           - DeviceName: /dev/xvda
             Ebs:
-              VolumeSize: 60       # root volume — OS + Docker images
+              VolumeSize: 75       # root volume — OS + Docker images (min 75 GB for this AMI)
               VolumeType: gp3
               DeleteOnTermination: true
               Encrypted: true
