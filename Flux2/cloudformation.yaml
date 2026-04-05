@@ -59,10 +59,7 @@ Parameters:
     AllowedValues:
       - g5.xlarge       # A10G 24 GB  — recommended, best price/performance
       - g6.xlarge       # L4  24 GB   — alternative
-      - g4dn.xlarge     # T4  16 GB   — budget option, needs --lowvram
-    Description: >
-      GPU instance type. g5.xlarge (A10G 24 GB) is recommended.
-      g4dn.xlarge (T4 16 GB) requires --lowvram and will be slower.
+    Description: GPU instance type. g5.xlarge (A10G 24 GB) is recommended.
 
   AvailabilityZone:
     Type: AWS::EC2::AvailabilityZone::Name
@@ -85,7 +82,6 @@ Parameters:
 Conditions:
   HasS3Bucket:       !Not [!Equals [!Ref ModelsBucketName, ""]]
   HasHfToken:        !Not [!Equals [!Ref HfToken, ""]]
-  NeedLowVram:       !Equals [!Ref InstanceType, "g4dn.xlarge"]
   HasExistingVolume: !Not [!Equals [!Ref ExistingVolumeId, ""]]
   CreateNewVolume:   !Equals [!Ref ExistingVolumeId, ""]
 
@@ -409,22 +405,14 @@ Resources:
               # --- Download LoRA ---
               ${LORA_DOWNLOAD_CMD}
 
-              # --- Download ComfyUI-GGUF custom node ---
-              GGUF_NODE=$MOUNT/custom_nodes/ComfyUI-GGUF
-              if [ ! -d "$GGUF_NODE" ]; then
-                git clone https://github.com/city96/ComfyUI-GGUF.git $GGUF_NODE
-              else
-                git -C $GGUF_NODE pull --ff-only
-              fi
-
               # --- Write docker-compose.yaml ---
               cat > $REPO_DIR/docker-compose.yaml << 'COMPOSE'
               services:
                 comfyui:
-                  build: .
-                  image: proto-comfyui:local
+                  image: ghcr.io/ai-dock/comfyui:latest-cuda
                   restart: unless-stopped
                   ports:
+                    - "1111:1111"
                     - "8188:8188"
                   volumes:
                     - /data/models:/opt/ComfyUI/models
@@ -432,7 +420,9 @@ Resources:
                     - /data/output:/opt/ComfyUI/output
                     - /data/custom_nodes:/opt/ComfyUI/custom_nodes
                   environment:
-                    - EXTRA_ARGS=${EXTRA_ARGS_VALUE}
+                    - NVIDIA_VISIBLE_DEVICES=all
+                    - NVIDIA_DRIVER_CAPABILITIES=all
+                    - WEB_AUTHENTICATION=false
                   deploy:
                     resources:
                       reservations:
@@ -442,9 +432,9 @@ Resources:
                             capabilities: [gpu]
               COMPOSE
 
-              # --- Build and start ComfyUI ---
+              # --- Start ComfyUI ---
               cd $REPO_DIR
-              docker compose build --pull
+              docker compose pull
               docker compose up -d
 
               echo "=== Setup complete ==="
@@ -453,10 +443,6 @@ Resources:
                 - HasS3Bucket
                 - !Sub "aws s3 cp s3://${ModelsBucketName}/models/loras/NSFW_master_ZIT_000008766.safetensors /data/models/loras/NSFW_master_ZIT_000008766.safetensors"
                 - "echo 'No S3 bucket configured \u2014 upload NSFW_master_ZIT_000008766.safetensors to /data/models/loras/ manually'"
-              EXTRA_ARGS_VALUE: !If
-                - NeedLowVram
-                - "--lowvram"
-                - ""
 
   # --- EC2 Instance ---------------------------------------------------------
 
