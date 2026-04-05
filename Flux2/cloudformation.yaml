@@ -325,17 +325,42 @@ Resources:
               mkdir -p $MOUNT/{input,output,custom_nodes,workflows}
               chown -R ec2-user:ec2-user $MOUNT
 
-              # --- Install HuggingFace Hub CLI ---
+              # --- Install HuggingFace Hub ---
               python3 -m pip install -q --upgrade "huggingface_hub" "hf_transfer"
-              HF_CLI="python3 -m huggingface_hub.commands.huggingface_cli"
 
-              # --- Clone Proto repo ---
+              # Write download helper using the Python API (avoids CLI path issues)
+              printf '%s\n' \
+                'import sys' \
+                'from huggingface_hub import hf_hub_download' \
+                'repo, local_dir, token = sys.argv[1], sys.argv[2], sys.argv[3]' \
+                'for fname in sys.argv[4:]:' \
+                '    print(fname, flush=True)' \
+                '    hf_hub_download(repo_id=repo, filename=fname, local_dir=local_dir, token=token)' \
+                > /tmp/hf_dl.py
+
+              # --- Load Proto repo from zip or git clone ---
               REPO_DIR=/home/ec2-user/Proto
-              if [ ! -d "$REPO_DIR" ]; then
-                echo "Cloning Proto repo..."
-                git clone https://github.com/Sinugba/Proto.git $REPO_DIR
+              if [ -f "$MOUNT/proto.zip" ]; then
+                echo "Found $MOUNT/proto.zip — extracting to $REPO_DIR..."
+                rm -rf "$REPO_DIR"
+                mkdir -p "$REPO_DIR"
+                unzip -q "$MOUNT/proto.zip" -d "$REPO_DIR"
+                # Flatten one level if zip contains a single top-level dir
+                INNER=$(find "$REPO_DIR" -mindepth 1 -maxdepth 1 -type d | head -1)
+                if [[ -n "$INNER" && $(find "$REPO_DIR" -mindepth 1 -maxdepth 1 | wc -l) -eq 1 ]]; then
+                  mv "$INNER"/* "$REPO_DIR"/ 2>/dev/null || true
+                  mv "$INNER"/.[!.]* "$REPO_DIR"/ 2>/dev/null || true
+                  rmdir "$INNER" 2>/dev/null || true
+                fi
+                echo "Repo loaded from zip."
               else
-                git -C $REPO_DIR pull --ff-only
+                echo "No proto.zip found on volume — falling back to git clone..."
+                echo "Tip: run ./setup.sh --upload-repo to place proto.zip on the volume."
+                if [ ! -d "$REPO_DIR" ]; then
+                  git clone https://github.com/Sinugba/Proto.git "$REPO_DIR"
+                else
+                  git -C "$REPO_DIR" pull --ff-only
+                fi
               fi
 
               # Copy workflows from repo to EBS before symlinking
@@ -357,22 +382,19 @@ Resources:
               fi
 
               echo "Downloading FLUX.1-dev unet (fp8)..."
-              $HF_CLI download Comfy-Org/flux1-dev \
-                flux1-dev-fp8-e4m3fn.safetensors \
-                --local-dir $MOUNT/models/unet \
-                --token "${HfToken}"
+              python3 /tmp/hf_dl.py "Comfy-Org/flux1-dev" \
+                "$MOUNT/models/unet" "${HfToken}" \
+                "flux1-dev-fp8-e4m3fn.safetensors"
 
               echo "Downloading CLIP encoders..."
-              $HF_CLI download comfyanonymous/flux_text_encoders \
-                clip_l.safetensors t5xxl_fp8_e4m3fn.safetensors \
-                --local-dir $MOUNT/models/clip \
-                --token "${HfToken}"
+              python3 /tmp/hf_dl.py "comfyanonymous/flux_text_encoders" \
+                "$MOUNT/models/clip" "${HfToken}" \
+                "clip_l.safetensors" "t5xxl_fp8_e4m3fn.safetensors"
 
               echo "Downloading VAE (ae.safetensors)..."
-              $HF_CLI download black-forest-labs/FLUX.1-dev \
-                ae.safetensors \
-                --local-dir $MOUNT/models/vae \
-                --token "${HfToken}"
+              python3 /tmp/hf_dl.py "black-forest-labs/FLUX.1-dev" \
+                "$MOUNT/models/vae" "${HfToken}" \
+                "ae.safetensors"
 
               # --- Download LoRA ---
               ${LORA_DOWNLOAD_CMD}

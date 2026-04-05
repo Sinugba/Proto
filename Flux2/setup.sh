@@ -184,6 +184,29 @@ cmd_upload_lora() {
     success "LoRA uploaded."
 }
 
+cmd_upload_repo() {
+    require_config "$KEY_PAIR_NAME" "KEY_PAIR_NAME"
+    INSTANCE_ID="$(get_instance_id)"
+    [[ -n "$INSTANCE_ID" ]] || error "No instance found. Deploy first with: ./setup.sh --deploy"
+    PUBLIC_IP="$(get_public_ip "$INSTANCE_ID")"
+    [[ -n "$PUBLIC_IP" && "$PUBLIC_IP" != "None" ]] || error "Instance has no public IP (may be stopped)."
+    ZIP=/tmp/proto-upload.zip
+    info "Creating zip of $PROTO_ROOT (excluding .git, __pycache__, *.pyc)..."
+    (cd "$PROTO_ROOT" && zip -qr "$ZIP" . \
+        --exclude "*.git*" \
+        --exclude "__pycache__/*" \
+        --exclude "*.pyc" \
+        --exclude "models/*" \
+        --exclude "input/*" \
+        --exclude "output/*")
+    info "Uploading to ec2-user@$PUBLIC_IP:/data/proto.zip..."
+    scp -i "$HOME/.ssh/${KEY_PAIR_NAME}.pem" \
+        -o StrictHostKeyChecking=no \
+        "$ZIP" "ec2-user@$PUBLIC_IP:/data/proto.zip"
+    rm -f "$ZIP"
+    success "Uploaded. The zip will be used on next instance boot (redeploy)."
+}
+
 cmd_status() {
     info "Stack status:"
     aws cloudformation describe-stacks \
@@ -232,14 +255,17 @@ cmd_connect() {
 }
 
 cmd_logs() {
+    require_config "$KEY_PAIR_NAME" "KEY_PAIR_NAME"
     INSTANCE_ID="$(get_instance_id)"
     [[ -n "$INSTANCE_ID" ]] || error "No instance found."
-    info "Tailing /var/log/flux-setup.log via SSM (Ctrl+C to stop)..."
-    aws ssm start-session \
-        --target "$INSTANCE_ID" \
-        --region "$REGION" \
-        --document-name AWS-StartInteractiveCommand \
-        --parameters '{"command":["sudo tail -f /var/log/flux-setup.log"]}'
+    PUBLIC_IP="$(get_public_ip "$INSTANCE_ID")"
+    [[ -n "$PUBLIC_IP" && "$PUBLIC_IP" != "None" ]] || error "Instance has no public IP (may be stopped)."
+    info "Tailing /var/log/flux-setup.log via SSH (Ctrl+C to stop)..."
+    ssh -i "$HOME/.ssh/${KEY_PAIR_NAME}.pem" \
+        -o StrictHostKeyChecking=no \
+        -o ServerAliveInterval=30 \
+        "ec2-user@$PUBLIC_IP" \
+        "sudo tail -f /var/log/flux-setup.log"
 }
 
 cmd_stop() {
@@ -296,8 +322,7 @@ usage() {
     echo ""
     echo "  (no args)          Interactive setup wizard"
     echo "  --deploy           Deploy using values in the CONFIGURATION section"
-  echo "  --upload-lora      Upload LoRA file to S3 bucket"
-    echo "  --status           Show stack, instance, and ComfyUI URL"
+  echo "  --upload-lora      Upload LoRA file to S3 bucket"  echo "  --upload-repo      Zip and SCP the local Proto repo to /data/proto.zip on the instance"    echo "  --status           Show stack, instance, and ComfyUI URL"
     echo "  --connect          SSH into the instance"
     echo "  --logs             Tail the setup log via SSM"
     echo "  --stop             Stop the instance (preserves EBS + models)"
@@ -310,6 +335,7 @@ usage() {
 case "${1:-}" in
     --deploy)         cmd_deploy ;;
     --upload-lora)    cmd_upload_lora ;;
+    --upload-repo)    cmd_upload_repo ;;
     --status)         cmd_status ;;
     --connect)        cmd_connect ;;
     --logs)           cmd_logs ;;
