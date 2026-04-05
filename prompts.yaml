@@ -446,3 +446,171 @@ ksampler_settings:
     scheduler: karras
     denoise: 0.5
     resolution: "match source image"
+
+# ===========================================================================
+# FLUX.1 — flux1-schnell-Q5_K_S.gguf  /  flux1-dev.safetensors
+# Loader: UnetLoaderGGUF node (ComfyUI-GGUF)
+# Encoders: clip_l.safetensors + t5xxl_fp8_e4m3fn.safetensors (DualCLIPLoader)
+# VAE: ae.safetensors
+#
+# CRITICAL differences from Pony / Illustrious:
+#   - Natural language sentences, NOT tag lists. Full sentences produce
+#     significantly better results than comma-separated Danbooru tags.
+#   - NO quality prefix tags (no score_N, masterpiece, best quality).
+#     Describe quality through subject/lighting/camera language instead.
+#   - FLUX.1-schnell: negative prompt is IGNORED (guidance-distilled, CFG=1).
+#     Include negatives anyway — they are used by FLUX.1-dev.
+#   - FLUX.1-dev supports negatives at CFG 3.5.
+#   - Native resolution 1024x1024. Use multiples of 64 for other ratios.
+# ===========================================================================
+
+# ---------------------------------------------------------------------------
+# FLUX.1 — SINGLE PERSON
+# ---------------------------------------------------------------------------
+
+flux_single_female:
+  description: "Single adult woman, photorealistic, outdoor — FLUX.1"
+  positive: >
+    A photorealistic portrait of a young adult woman in her late 20s, standing
+    outdoors in a park during golden hour. She has long brown hair, bright eyes,
+    and a warm natural smile. She is wearing a casual linen outfit. The background
+    shows soft bokeh trees. The lighting is warm and directional. Shot on a
+    full-frame camera with a 85mm lens, shallow depth of field, skin texture visible.
+  negative: >
+    blurry, low resolution, bad anatomy, deformed hands, extra fingers,
+    missing fingers, disfigured, watermark, text overlay, cartoon, anime,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
+  tips:
+    - "FLUX.1-schnell ignores the negative prompt — it only applies for FLUX.1-dev"
+    - "Describe the shot as a photographer would: lens, lighting, depth of field"
+    - "Age descriptors like 'in her late 20s' are more reliable than tag anchors"
+    - "Avoid tag-style comma lists — full descriptive sentences yield better faces"
+
+flux_single_male:
+  description: "Single adult man, photorealistic, outdoor — FLUX.1"
+  positive: >
+    A photorealistic portrait of a young adult man in his early 30s, standing
+    in an urban street environment. He has short dark hair, a defined jawline,
+    and casual confidence. He is wearing a dark jacket over a white t-shirt.
+    The background is a softly blurred city street with evening ambient light.
+    Shot on a 50mm lens, sharp focus on face, natural color grading.
+  negative: >
+    blurry, low resolution, bad anatomy, deformed hands, extra fingers,
+    missing fingers, disfigured, watermark, text overlay, cartoon, anime,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
+
+# ---------------------------------------------------------------------------
+# FLUX.1 — MULTI-PERSON
+# ---------------------------------------------------------------------------
+
+flux_duo_standing:
+  description: "Adult man and adult woman standing together — FLUX.1"
+  positive: >
+    A photorealistic full-body photo of two adults: a man in his early 30s
+    and a woman in her late 20s, standing side by side outdoors. Both are
+    smiling and looking at the camera. The man is wearing dark jeans and a
+    casual button-up shirt. The woman is wearing a floral summer dress.
+    The background is a sunlit park. Natural daylight, sharp focus on both faces,
+    both figures fully visible from head to toe.
+  negative: >
+    blurry, low resolution, bad anatomy, deformed hands, extra fingers,
+    missing fingers, three people, extra person, single person, solo,
+    disfigured, watermark, text, cartoon, anime,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
+  tips:
+    - "Describe both people explicitly in the sentence — FLUX.1 tracks subject count via language"
+    - "Include 'both figures fully visible' to prevent cropped or partial bodies"
+    - "For better two-person composition use 1216x832 (wide landscape ratio)"
+
+flux_duo_cafe:
+  description: "Adult man and adult woman sitting at a cafe — FLUX.1"
+  positive: >
+    A photorealistic photo of two adults sitting across from each other at a
+    small cafe table. The man is in his 30s with short hair and a casual sweater.
+    The woman is in her late 20s with wavy hair and a light blouse, holding a
+    coffee cup. The cafe interior has warm ambient lighting, wooden furniture,
+    and a blurred background of other tables. Both people are in sharp focus,
+    smiling, engaged in conversation.
+  negative: >
+    blurry, low resolution, bad anatomy, deformed hands, extra fingers,
+    missing fingers, three people, extra person, solo, single person,
+    disfigured, watermark, text, cartoon, anime,
+    child, children, kid, kids, minor, minors, teen, teenager, underage,
+    loli, shota, childlike, juvenile, baby face, school age,
+    old, elderly, old man, old woman, grandpa, grandma, aged, wrinkled, senior
+
+# ---------------------------------------------------------------------------
+# FLUX.1 — SCENE / NO PERSON
+# ---------------------------------------------------------------------------
+
+flux_landscape:
+  description: "Landscape scene — FLUX.1"
+  positive: >
+    A sweeping photorealistic landscape photograph of a mountain valley at
+    sunrise. Snow-capped peaks reflect orange and pink light. A winding river
+    cuts through a green meadow below. Long exposure, ultra-sharp foreground,
+    dramatic sky with scattered clouds. Shot on a wide-angle 16mm lens, tripod,
+    f/11, golden hour light.
+  negative: >
+    blurry, low resolution, watermark, text overlay, cartoon, oversaturated,
+    HDR clipping, lens flare artifacts, people, person, human figure
+
+flux_interior:
+  description: "Interior room scene — FLUX.1"
+  positive: >
+    A photorealistic interior photograph of a modern minimalist living room.
+    Large floor-to-ceiling windows let in soft diffused daylight. The room
+    features a low white sofa, a concrete coffee table, a single potted plant,
+    and polished wooden floors. Clean lines, neutral palette, architectural
+    photography style, tack-sharp focus throughout, no people.
+  negative: >
+    blurry, low resolution, watermark, text, cartoon, people, person,
+    human figure, cluttered, dark, gloomy
+
+# ---------------------------------------------------------------------------
+# FLUX.1 — KSAMPLER SETTINGS
+# ---------------------------------------------------------------------------
+
+flux_ksampler_settings:
+  schnell:
+    steps: 4
+    cfg_scale: 1.0
+    sampler: euler
+    scheduler: simple
+    denoise: 1.0
+    resolution: "1024x1024"
+    notes: >
+      Negative prompt is ignored. CFG must be 1.0 for schnell.
+      4 steps is the designed inference count — more steps do not improve quality.
+      Use 1216x832 for landscape / two-person shots.
+      Expect 30-60s per image on 8 GB VRAM with --lowvram.
+
+  dev:
+    steps: 20
+    cfg_scale: 3.5
+    sampler: euler
+    scheduler: simple
+    denoise: 1.0
+    resolution: "1024x1024"
+    notes: >
+      FLUX.1-dev supports negative prompts at CFG 3.5.
+      Requires ~16 GB VRAM at full precision; use GGUF Q5_K_S with --lowvram
+      on 8 GB cards (slower than schnell).
+
+  img2img:
+    steps: 10
+    cfg_scale: 1.0
+    sampler: euler
+    scheduler: simple
+    denoise: 0.6
+    resolution: "match source image"
+    notes: >
+      Schnell img2img: keep denoise at 0.5-0.7. Higher = more change.
+      FLUX.1 does not use an inpaint model the same way SDXL does;
+      use ComfyUI inpaint nodes with a masked latent for region control.
