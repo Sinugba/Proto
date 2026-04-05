@@ -334,48 +334,14 @@ Resources:
                 '    hf_hub_download(repo_id=repo, filename=fname, local_dir=local_dir, token=token)' \
                 > /tmp/hf_dl.py
 
-              # --- Load Proto repo from zip or git clone ---
-              REPO_DIR=/home/ec2-user/Proto
-              if [ -f "$MOUNT/proto.zip" ]; then
-                echo "Found $MOUNT/proto.zip — extracting to $REPO_DIR..."
-                rm -rf "$REPO_DIR"
-                mkdir -p "$REPO_DIR"
-                unzip -q "$MOUNT/proto.zip" -d "$REPO_DIR"
-                # Flatten one level if zip contains a single top-level dir
-                INNER=$(find "$REPO_DIR" -mindepth 1 -maxdepth 1 -type d | head -1)
-                if [[ -n "$INNER" && $(find "$REPO_DIR" -mindepth 1 -maxdepth 1 | wc -l) -eq 1 ]]; then
-                  mv "$INNER"/* "$REPO_DIR"/ 2>/dev/null || true
-                  mv "$INNER"/.[!.]* "$REPO_DIR"/ 2>/dev/null || true
-                  rmdir "$INNER" 2>/dev/null || true
-                fi
-                echo "Repo loaded from zip."
-              else
-                echo "WARNING: No proto.zip found on volume and repo is private."
-                echo "WARNING: Git clone will likely fail. Run: ./Flux2/setup.sh --upload-repo"
-                echo "WARNING: then ./Flux2/setup.sh --rerun-setup to complete setup."
-                if [ ! -d "$REPO_DIR" ]; then
-                  git clone https://github.com/Sinugba/Proto.git "$REPO_DIR" || {
-                    echo "ERROR: git clone failed. Upload proto.zip and run --rerun-setup."
-                    REPO_DIR=""
-                  }
-                else
-                  git -C "$REPO_DIR" pull --ff-only || echo "WARNING: git pull failed, using existing repo."
-                fi
-              fi
+              # --- Create working directory for docker compose ---
+              # Workflows are loaded via ComfyUI web UI — no repo clone needed.
+              REPO_DIR=/home/ec2-user/comfyui
+              mkdir -p $REPO_DIR
 
-              if [[ -z "$REPO_DIR" || ! -d "$REPO_DIR" ]]; then
-                echo "No repo available — skipping workflow copy and Docker start."
-                echo "=== Partial setup complete — upload proto.zip and run --rerun-setup ==="
-                exit 0
-              fi
-
-              # Copy workflows from repo to EBS before symlinking
-              cp -n $REPO_DIR/workflows/*.json $MOUNT/workflows/ 2>/dev/null || true
-
-              # Symlink model dirs from repo expected path to EBS mount
-              for d in models input output custom_nodes workflows; do
-                rm -rf $REPO_DIR/$d
-                ln -sf $MOUNT/$d $REPO_DIR/$d
+              # Symlink model dirs from EBS mount
+              for d in models input output custom_nodes; do
+                ln -sfn $MOUNT/$d $REPO_DIR/$d
               done
 
               # --- Download models from HuggingFace ---
