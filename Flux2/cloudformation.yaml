@@ -356,7 +356,7 @@ Resources:
               echo "Downloading FLUX.1-dev unet (fp8)..."
               python3 /tmp/hf_dl.py "Comfy-Org/flux1-dev" \
                 "$MOUNT/models/unet" "${HfToken}" \
-                "flux1-dev-fp8-e4m3fn.safetensors"
+                "flux1-dev-fp8.safetensors"
 
               echo "Downloading CLIP encoders..."
               python3 /tmp/hf_dl.py "comfyanonymous/flux_text_encoders" \
