@@ -160,7 +160,7 @@ Resources:
   SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: "FLUX.1 ComfyUI — restricted to workstation IP only"
+      GroupDescription: "FLUX.1 ComfyUI - restricted to workstation IP only"
       VpcId: !Ref VPC
       SecurityGroupIngress:
         - IpProtocol: tcp
