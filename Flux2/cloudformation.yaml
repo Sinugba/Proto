@@ -314,7 +314,8 @@ Resources:
               chown -R ec2-user:ec2-user $MOUNT
 
               # --- Install HuggingFace Hub CLI ---
-              python3 -m pip install -q --upgrade "huggingface_hub[cli]"
+              python3 -m pip install -q --upgrade "huggingface_hub" "hf_transfer"
+              HF_CLI="python3 -m huggingface_hub.commands.huggingface_cli"
 
               # --- Clone Proto repo ---
               REPO_DIR=/home/ec2-user/Proto
@@ -344,19 +345,19 @@ Resources:
               fi
 
               echo "Downloading FLUX.1-dev unet (fp8)..."
-              huggingface-cli download Comfy-Org/flux1-dev \
+              $HF_CLI download Comfy-Org/flux1-dev \
                 flux1-dev-fp8-e4m3fn.safetensors \
                 --local-dir $MOUNT/models/unet \
                 --token "${HfToken}"
 
               echo "Downloading CLIP encoders..."
-              huggingface-cli download comfyanonymous/flux_text_encoders \
+              $HF_CLI download comfyanonymous/flux_text_encoders \
                 clip_l.safetensors t5xxl_fp8_e4m3fn.safetensors \
                 --local-dir $MOUNT/models/clip \
                 --token "${HfToken}"
 
               echo "Downloading VAE (ae.safetensors)..."
-              huggingface-cli download black-forest-labs/FLUX.1-dev \
+              $HF_CLI download black-forest-labs/FLUX.1-dev \
                 ae.safetensors \
                 --local-dir $MOUNT/models/vae \
                 --token "${HfToken}"
