@@ -28,11 +28,11 @@ set -euo pipefail
 STACK_NAME="flux1-dev-comfyui"
 REGION="us-east-1"
 INSTANCE_TYPE="g5.xlarge"           # A10G 24 GB — recommended
-KEY_PAIR_NAME=""                     # Your EC2 key pair name (no .pem extension)
-ALLOWED_CIDR="165.171.157.165/32"                      # Your IP: e.g. 203.0.113.5/32
+KEY_PAIR_NAME="flux-dev"              # EC2 key pair name — ~/.ssh/flux-dev.pem must exist locally
+ALLOWED_CIDR="165.171.157.165/32"    # Your IP: e.g. 203.0.113.5/32
 SPOT_MAX_PRICE="0.50"
 EBS_VOLUME_SIZE="150"
-HF_TOKEN=""                          # HuggingFace token (REQUIRED — accept BFL license at huggingface.co/black-forest-labs/FLUX.1-dev)
+HF_TOKEN=""                          # HuggingFace token — leave blank to be prompted at deploy time
 LORA_URL=""                          # Direct download URL for LoRA (e.g. Civitai download URL)
 CFN_TEMPLATE="$(dirname "$0")/cloudformation.yaml"
 
@@ -108,6 +108,10 @@ cmd_deploy() {
     cmd_check_prereqs
     require_config "$KEY_PAIR_NAME"  "KEY_PAIR_NAME"
     require_config "$ALLOWED_CIDR"   "ALLOWED_CIDR"
+    if [[ -z "$HF_TOKEN" ]]; then
+        read -rsp "HuggingFace token (hidden, REQUIRED): " HF_TOKEN; echo ""
+        [[ -n "$HF_TOKEN" ]] || error "HF_TOKEN is required to download models."
+    fi
 
     info "Validating CloudFormation template..."
     aws cloudformation validate-template \
