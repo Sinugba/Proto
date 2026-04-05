@@ -10,3 +10,9 @@ input/
 # Keep workflows folder but ignore any large binary files inside it
 workflows/*.png
 workflows/*.jpg
+
+# ComfyUI custom nodes (cloned at runtime by setup.ps1)
+custom_nodes/
+
+# Local test prompts (not for version control)
+.TestPrompts/
