@@ -71,13 +71,23 @@ Parameters:
       AZ for the subnet and EBS volume. Both must be in the same AZ.
       g5.xlarge is unavailable in us-east-1a — use us-east-1b/c/d/f.
 
+  ExistingVolumeId:
+    Type: String
+    Default: ""
+    Description: >
+      (Optional) ID of a pre-existing EBS volume to attach (e.g. vol-0c1ab9ebeb15c4bc0).
+      Use this to reuse a volume from a previous stack that was retained on delete.
+      Leave blank to create a new volume.
+
 # ---------------------------------------------------------------------------
 # Conditions
 # ---------------------------------------------------------------------------
 Conditions:
-  HasS3Bucket:  !Not [!Equals [!Ref ModelsBucketName, ""]]
-  HasHfToken:   !Not [!Equals [!Ref HfToken, ""]]
-  NeedLowVram:  !Equals [!Ref InstanceType, "g4dn.xlarge"]
+  HasS3Bucket:       !Not [!Equals [!Ref ModelsBucketName, ""]]
+  HasHfToken:        !Not [!Equals [!Ref HfToken, ""]]
+  NeedLowVram:       !Equals [!Ref InstanceType, "g4dn.xlarge"]
+  HasExistingVolume: !Not [!Equals [!Ref ExistingVolumeId, ""]]
+  CreateNewVolume:   !Equals [!Ref ExistingVolumeId, ""]
 
 # ---------------------------------------------------------------------------
 # Mappings — latest Deep Learning AMI (Amazon Linux 2023, GPU)
@@ -227,9 +237,11 @@ Resources:
 
   # --- EBS Data Volume ------------------------------------------------------
   # Separate from root volume so models survive instance replacement.
+  # Skipped when ExistingVolumeId is provided.
 
   ModelsVolume:
     Type: AWS::EC2::Volume
+    Condition: CreateNewVolume
     DeletionPolicy: Retain   # IMPORTANT: retain models on stack delete
     Properties:
       AvailabilityZone: !Ref AvailabilityZone
@@ -433,7 +445,7 @@ Resources:
     Type: AWS::EC2::VolumeAttachment
     Properties:
       InstanceId: !Ref Instance
-      VolumeId: !Ref ModelsVolume
+      VolumeId: !If [HasExistingVolume, !Ref ExistingVolumeId, !Ref ModelsVolume]
       Device: /dev/sdf      # shown as /dev/nvme1n1 inside AL2023
 
 # ---------------------------------------------------------------------------

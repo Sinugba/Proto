@@ -33,6 +33,7 @@ KEY_PAIR_NAME="flux-dev"              # EC2 key pair name — ~/.ssh/flux-dev.pe
 ALLOWED_CIDR="165.171.157.165/32"    # Your IP: e.g. 203.0.113.5/32
 SPOT_MAX_PRICE="0.50"
 EBS_VOLUME_SIZE="150"
+EXISTING_VOLUME_ID="vol-0c1ab9ebeb15c4bc0" # Retained volume — leave blank to create new
 HF_TOKEN=""                          # HuggingFace token — leave blank to be prompted at deploy time
 S3_BUCKET_NAME="flux1-dev"                    # S3 bucket containing the LoRA file
 
@@ -134,8 +135,9 @@ cmd_deploy() {
         "ParameterKey=SpotMaxPrice,ParameterValue=$SPOT_MAX_PRICE"
         "ParameterKey=EbsVolumeSize,ParameterValue=$EBS_VOLUME_SIZE"
     )
-    [[ -n "$HF_TOKEN"       ]] && PARAMS+=("ParameterKey=HfToken,ParameterValue=$HF_TOKEN")
-    [[ -n "$S3_BUCKET_NAME" ]] && PARAMS+=("ParameterKey=ModelsBucketName,ParameterValue=$S3_BUCKET_NAME")
+    [[ -n "$HF_TOKEN"          ]] && PARAMS+=("ParameterKey=HfToken,ParameterValue=$HF_TOKEN")
+    [[ -n "$S3_BUCKET_NAME"    ]] && PARAMS+=("ParameterKey=ModelsBucketName,ParameterValue=$S3_BUCKET_NAME")
+    [[ -n "$EXISTING_VOLUME_ID" ]] && PARAMS+=("ParameterKey=ExistingVolumeId,ParameterValue=$EXISTING_VOLUME_ID")
 
     # Deploy (create or update)
     STACK_STATUS=$(aws cloudformation describe-stacks \
