@@ -82,7 +82,7 @@ Conditions:
 Mappings:
   RegionAMI:
     us-east-1:
-      AMI: ami-005fc0f236362e99f   # Deep Learning Base OSS Nvidia Driver - AL2023
+      AMI: ami-0a358baf4ce730c1a   # Deep Learning Base OSS Nvidia Driver GPU AMI (Amazon Linux 2023) 20260403
     us-west-2:
       AMI: ami-0b20a6f09484773af
     eu-west-1:
