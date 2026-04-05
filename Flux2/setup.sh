@@ -268,6 +268,21 @@ cmd_logs() {
         "sudo tail -f /var/log/flux-setup.log"
 }
 
+cmd_rerun_setup() {
+    require_config "$KEY_PAIR_NAME" "KEY_PAIR_NAME"
+    INSTANCE_ID="$(get_instance_id)"
+    [[ -n "$INSTANCE_ID" ]] || error "No instance found. Deploy first with: ./setup.sh --deploy"
+    PUBLIC_IP="$(get_public_ip "$INSTANCE_ID")"
+    [[ -n "$PUBLIC_IP" && "$PUBLIC_IP" != "None" ]] || error "Instance has no public IP (may be stopped)."
+    info "Re-running setup on $PUBLIC_IP (sudo cloud-init rerun)..."
+    ssh -i "$HOME/.ssh/${KEY_PAIR_NAME}.pem" \
+        -o StrictHostKeyChecking=no \
+        -o ServerAliveInterval=30 \
+        "ec2-user@$PUBLIC_IP" \
+        'sudo rm -f /var/lib/cloud/instances/*/sem/config_scripts_user && sudo cloud-init single --name scripts-user && sudo tail -20 /var/log/flux-setup.log'
+    success "Setup re-run triggered. Follow progress: ./setup.sh --logs"
+}
+
 cmd_stop() {
     INSTANCE_ID="$(get_instance_id)"
     [[ -n "$INSTANCE_ID" ]] || error "No instance found."
@@ -322,9 +337,12 @@ usage() {
     echo ""
     echo "  (no args)          Interactive setup wizard"
     echo "  --deploy           Deploy using values in the CONFIGURATION section"
-  echo "  --upload-lora      Upload LoRA file to S3 bucket"  echo "  --upload-repo      Zip and SCP the local Proto repo to /data/proto.zip on the instance"    echo "  --status           Show stack, instance, and ComfyUI URL"
+    echo "  --upload-lora      Upload LoRA file to S3 bucket"
+    echo "  --upload-repo      Zip and SCP the local Proto repo to /data/proto.zip on the instance"
+    echo "  --rerun-setup      Re-run the UserData setup script on a running instance"
+    echo "  --status           Show stack, instance, and ComfyUI URL"
     echo "  --connect          SSH into the instance"
-    echo "  --logs             Tail the setup log via SSM"
+    echo "  --logs             Tail the setup log via SSH"
     echo "  --stop             Stop the instance (preserves EBS + models)"
     echo "  --start            Start a previously stopped instance"
     echo "  --teardown         Delete the stack (EBS volume is retained)"
@@ -336,6 +354,7 @@ case "${1:-}" in
     --deploy)         cmd_deploy ;;
     --upload-lora)    cmd_upload_lora ;;
     --upload-repo)    cmd_upload_repo ;;
+    --rerun-setup)    cmd_rerun_setup ;;
     --status)         cmd_status ;;
     --connect)        cmd_connect ;;
     --logs)           cmd_logs ;;

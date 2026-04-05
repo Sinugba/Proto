@@ -354,13 +354,23 @@ Resources:
                 fi
                 echo "Repo loaded from zip."
               else
-                echo "No proto.zip found on volume — falling back to git clone..."
-                echo "Tip: run ./setup.sh --upload-repo to place proto.zip on the volume."
+                echo "WARNING: No proto.zip found on volume and repo is private."
+                echo "WARNING: Git clone will likely fail. Run: ./Flux2/setup.sh --upload-repo"
+                echo "WARNING: then ./Flux2/setup.sh --rerun-setup to complete setup."
                 if [ ! -d "$REPO_DIR" ]; then
-                  git clone https://github.com/Sinugba/Proto.git "$REPO_DIR"
+                  git clone https://github.com/Sinugba/Proto.git "$REPO_DIR" || {
+                    echo "ERROR: git clone failed. Upload proto.zip and run --rerun-setup."
+                    REPO_DIR=""
+                  }
                 else
-                  git -C "$REPO_DIR" pull --ff-only
+                  git -C "$REPO_DIR" pull --ff-only || echo "WARNING: git pull failed, using existing repo."
                 fi
+              fi
+
+              if [[ -z "$REPO_DIR" || ! -d "$REPO_DIR" ]]; then
+                echo "No repo available — skipping workflow copy and Docker start."
+                echo "=== Partial setup complete — upload proto.zip and run --rerun-setup ==="
+                exit 0
               fi
 
               # Copy workflows from repo to EBS before symlinking
